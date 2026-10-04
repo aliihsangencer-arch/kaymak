@@ -345,7 +345,7 @@ function init(o){S=migrate(o);S.ui=Object.assign({view:'ozet',week:0,examId:null
     if(past.length)cur.subjects.forEach(sb=>{const dn=sb.topics.filter(t=>prog(s.id)[t.id]?.status==='done');dn.forEach((t,i)=>{const k=past[Math.floor(i*past.length/dn.length)];(W[k]||(W[k]=[])).push({id:uid(),subj:sb.id,topic:t.id})})});
     buildPlan(s)})}
 let S;
-function save(){if(VIEW||!AUTHU)return;try{localStorage.setItem(KEY+':'+AUTHU.id,JSON.stringify(S));localStorage.setItem(KEY+':pending:'+AUTHU.id,'1')}catch(e){}cloudDirty()}
+function save(){if(STUDENT){stuSync();return}if(VIEW||!AUTHU)return;try{localStorage.setItem(KEY+':'+AUTHU.id,JSON.stringify(S));localStorage.setItem(KEY+':pending:'+AUTHU.id,'1')}catch(e){}cloudDirty()}
 let toastT;function toast(m){const t=document.getElementById('toast');t.textContent=m;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,2200)}
 
 const st=()=>S.students.find(s=>s.id===S.active)||S.students[0];
@@ -737,6 +737,7 @@ function reportText(s){
 }
 
 VIEWS.ogrenciler=()=>{
+  if(AUTHU&&!VIEW&&SA.map===null&&!SA.busy)saLoad();
   const e=S.students.find(x=>x.id===S.ui.editStudent)||null;
   const f=e||{name:'',grade:'8',exam:'LGS',curId:S.curricula[0]?.id,curIds:S.curricula[0]?[S.curricula[0].id]:[],parent:'',parentEmail:'',parentPhone:'',startDate:iso(mondayOf(today())),examDate:DEF_EXAM()};
   return `${head('Öğrenciler',`<span class="pill mut">${S.students.length} öğrenci</span>`)}
@@ -759,8 +760,8 @@ VIEWS.ogrenciler=()=>{
   </section>
   <section class="stu">${S.students.map(x=>{const c=curById(x.curId);const r=doneExams(x);const last=r.length?scoreExam(r[r.length-1]).net:null;
     return `<article class="card ${x.id===S.active?'on':''}"><div class="card-h"><h2>${esc(x.name)}</h2>${x.sample?'<span class="pill mut">Örnek</span>':''}</div>
-    <dl class="kv"><dt>Sınıf</dt><dd>${esc(x.grade)}${/^\d/.test(x.grade)?'. sınıf':''}</dd><dt>Sınav</dt><dd>${esc(x.exam)}</dd><dt>Müfredat</dt><dd>${esc((x.curIds||[]).map(i=>curById(i)?.name).filter(Boolean).join(', ')||c?.name||'—')}</dd><dt>Veli</dt><dd>${esc(x.parent||'—')}${x.parentEmail?` · ${esc(x.parentEmail)}`:''}</dd><dt>Son net</dt><dd class="num">${last!==null?n2(last):'—'}</dd></dl>
-    <div class="row" style="gap:6px">${x.id===S.active?'<span class="pill ok">Seçili</span>':`<button class="btn sm primary" data-a="pick" data-id="${x.id}">Seç</button>`}<button class="btn sm" data-a="editStudent" data-id="${x.id}">Düzenle</button>${delBtn('student',x.id)}</div></article>`}).join('')}</section>`;
+    <dl class="kv"><dt>Sınıf</dt><dd>${esc(x.grade)}${/^\d/.test(x.grade)?'. sınıf':''}</dd><dt>Sınav</dt><dd>${esc(x.exam)}</dd><dt>Müfredat</dt><dd>${esc((x.curIds||[]).map(i=>curById(i)?.name).filter(Boolean).join(', ')||c?.name||'—')}</dd><dt>Veli</dt><dd>${esc(x.parent||'—')}${x.parentEmail?` · ${esc(x.parentEmail)}`:''}</dd><dt>Öğrenci girişi</dt><dd>${AUTHU&&!VIEW?(SA.map===null?'…':SA.map[x.id]?esc(SA.map[x.id]):'yok'):'—'}</dd><dt>Son net</dt><dd class="num">${last!==null?n2(last):'—'}</dd></dl>
+    <div class="row" style="gap:6px">${x.id===S.active?'<span class="pill ok">Seçili</span>':`<button class="btn sm primary" data-a="pick" data-id="${x.id}">Seç</button>`}<button class="btn sm" data-a="editStudent" data-id="${x.id}">Düzenle</button>${AUTHU&&!VIEW?`<button class="btn sm" data-a="stuAcc" data-id="${x.id}">Öğrenci girişi</button>`:''}${delBtn('student',x.id)}</div></article>`}).join('')}</section>`;
 };
 
 VIEWS.mufredat=()=>{
@@ -997,9 +998,9 @@ function render(){
   document.body.classList.toggle('smode',!!S.stuMode);if(S.stuMode&&!STU_VIEWS.includes(S.ui.view))S.ui.view='matris';if(S.stuMode&&S.ui.examMode==='edit'){S.ui.examId=null;S.ui.examMode=null}
   const s=st();
   document.getElementById('side').innerHTML=`<div class="side-top"><div class="brand"><span class="logo">k</span><b>k-Koçluk</b></div>${PARENT?`<div><span class="pill mut">Veli görünümü</span>${s&&(s.curIds||[]).length>1?`<div style="margin-top:8px"><select id="active-cur" data-c="activeCur" aria-label="Sınav" style="width:100%">${s.curIds.map(i=>curById(i)).filter(Boolean).map(c=>`<option value="${c.id}" ${c.id===curOf(s).id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div>`:''}</div>`:''}
-    <div class="who"><label for="active">Öğrenci</label><select id="active" data-c="active" style="width:100%" ${S.stuMode?'disabled':''}>${S.students.map(x=>`<option value="${x.id}" ${s&&x.id===s.id?'selected':''}>${esc(x.name)}</option>`).join('')||'<option>—</option>'}</select>${s&&(s.curIds||[]).length>1?`<label for="active-cur" style="margin-top:8px">Sınav</label><select id="active-cur" data-c="activeCur" style="width:100%">${s.curIds.map(i=>curById(i)).filter(Boolean).map(c=>`<option value="${c.id}" ${c.id===curOf(s).id?'selected':''}>${esc(c.name)}</option>`).join('')}</select>`:''}<div class="mode">${S.stuMode?'<span class="pill warn">Öğrenci modu</span><button class="btn sm link" data-a="coachMode">Koç girişi</button>':'<button class="btn sm link" data-a="stuMode">Öğrenci moduna geç</button><button class="btn sm link" data-a="signOut">Çıkış</button>'}</div></div></div>
+    <div class="who"><label for="active">Öğrenci</label><select id="active" data-c="active" style="width:100%" ${S.stuMode?'disabled':''}>${S.students.map(x=>`<option value="${x.id}" ${s&&x.id===s.id?'selected':''}>${esc(x.name)}</option>`).join('')||'<option>—</option>'}</select>${s&&(s.curIds||[]).length>1?`<label for="active-cur" style="margin-top:8px">Sınav</label><select id="active-cur" data-c="activeCur" style="width:100%">${s.curIds.map(i=>curById(i)).filter(Boolean).map(c=>`<option value="${c.id}" ${c.id===curOf(s).id?'selected':''}>${esc(c.name)}</option>`).join('')}</select>`:''}<div class="mode">${STUDENT?`<span class="pill ext">${esc(STUDENT.username)}</span><button class="btn sm link" data-a="stuLogout">Çıkış</button>`:S.stuMode?'<span class="pill warn">Öğrenci modu</span><button class="btn sm link" data-a="coachMode">Koç girişi</button>':'<button class="btn sm link" data-a="stuMode">Öğrenci moduna geç</button><button class="btn sm link" data-a="signOut">Çıkış</button>'}</div></div></div>
     <nav class="nav">${(PARENT?PARENT_NAV:S.stuMode?NAV.filter(([v])=>STU_VIEWS.includes(v)):ME?.role==='admin'?[...NAV,['yonetici','Yönetici']]:NAV).map(([v,l])=>`<button class="${S.ui.view===v?'on':''}" data-a="go" data-v="${v}">${l}</button>`).join('')}</nav>
-    <p class="side-foot">${PARENT?`Koç: ${esc(PARENT.coach)}<br>Yalnızca görüntüleme`:`<span id="sync">${syncText()}</span><br>${esc(ME?.email||'')}`}</p>`;
+    <p class="side-foot">${STUDENT?`<span id="sync">${stuSyncText()}</span><br>Koç: ${esc(STUDENT.coach)}`:PARENT?`Koç: ${esc(PARENT.coach)}<br>Yalnızca görüntüleme`:`<span id="sync">${syncText()}</span><br>${esc(ME?.email||'')}`}</p>`;
   if(S.ui.view==='yonetici'&&ME?.role!=='admin')S.ui.view='ozet';
   document.getElementById('main').innerHTML=(VIEW?`<div class="banner" role="status"><span><b>${esc(VIEW.name)}</b> adlı koçun kayıtlarını görüntülüyorsun. Burada yaptığın değişiklikler kaydedilmez.</span><button class="btn sm primary" data-a="viewExit">Kendi panelime dön</button></div>`:'')+(VIEWS[S.ui.view]||VIEWS.ozet)();
 }
@@ -1153,7 +1154,7 @@ let ASK=null;
 function ask(title,detail,yes){ASK=yes;const d=document.getElementById('dlg');
   d.innerHTML=`<div class="dlg" role="alertdialog" aria-modal="true" aria-labelledby="dlg-t" aria-describedby="dlg-d"><h2 id="dlg-t">${esc(title)}</h2>${detail?`<p id="dlg-d" class="muted">${esc(detail)}</p>`:''}<div class="dlg-b"><button class="btn danger" data-a="askYes">Evet</button><button class="btn" data-a="askNo">Hayır</button></div></div>`;
   d.hidden=false;d.querySelector('[data-a="askNo"]').focus()}
-function closeAsk(){ASK=null;MXE=null;const d=document.getElementById('dlg');d.hidden=true;d.innerHTML=''}
+function closeAsk(){ASK=null;MXE=null;SAE=null;const d=document.getElementById('dlg');d.hidden=true;d.innerHTML=''}
 const DELPRE={
   cur:id=>S.students.some(s=>s.curId===id||(s.curIds||[]).includes(id))?'Bu müfredatı kullanan öğrenci var; önce öğrencinin müfredatını değiştir':''
 };
@@ -1233,9 +1234,10 @@ const C={
 };
 document.addEventListener('click',e=>{if(e.target.id==='dlg'){closeAsk();return}const el=e.target.closest('[data-a]');if(!el)return;const a=el.dataset.a;
   if(PARENT&&!(PARENT_OK.has(a)&&(a!=='go'||PARENT_NAV.some(([v])=>v===el.dataset.v))&&(a!=='openExam'||el.dataset.m==='result'))){e.preventDefault();return}
+  if(STUDENT&&STUDENT_NO.has(a)){e.preventDefault();toast('Bunu yalnızca koç yapabilir');return}
   if(S&&S.stuMode){if(STU_DENY.has(a)){e.preventDefault();toast('Silme yetkisi yalnızca koçta');return}if(a==='optik'&&S.exams.find(x=>x.id===el.dataset.id)?.done){e.preventDefault();toast('Bu deneme tamamlandı; yeniden açmayı yalnızca koç yapabilir');return}if(STU_COACH.has(a)||(a==='openExam'&&el.dataset.m==='edit')||(a==='go'&&!STU_VIEWS.includes(el.dataset.v))){e.preventDefault();toast('Bu sayfa yalnızca koça açık');return}}
   const f=A[a];if(f){e.preventDefault();f(el)}});
-document.addEventListener('change',e=>{const el=e.target.closest('[data-c]');if(!el)return;if(PARENT&&el.dataset.c!=='activeCur'){if(el.type==='checkbox')el.checked=!el.checked;return}if(S&&S.stuMode&&el.dataset.c==='planDone'){el.checked=!el.checked;toast('Konuyu işlendi olarak yalnızca koç işaretler');return}const f=C[el.dataset.c];if(f)f(el)});
+document.addEventListener('change',e=>{const el=e.target.closest('[data-c]');if(!el)return;if(PARENT&&el.dataset.c!=='activeCur'){if(el.type==='checkbox')el.checked=!el.checked;return}if(STUDENT&&el.dataset.c==='bookName'){render();toast('Kitapları yalnızca koç düzenler');return}if(S&&S.stuMode&&el.dataset.c==='planDone'){el.checked=!el.checked;toast('Konuyu işlendi olarak yalnızca koç işaretler');return}const f=C[el.dataset.c];if(f)f(el)});
 document.addEventListener('toggle',e=>{const d=e.target;if(!d.matches)return;if(d.matches('details.wk'))d.open?OPENW.add(d.dataset.k):OPENW.delete(d.dataset.k);else if(d.matches('details.pd'))d.open?OPENP.add(d.dataset.id):OPENP.delete(d.dataset.id)},true);
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!document.getElementById('dlg').hidden){closeAsk();return}if(e.key==='Escape'&&PV){pvClose();return}if(e.key==='Enter'&&e.target.closest('#gate')&&e.target.matches('input')){e.preventDefault();document.querySelector('#gate .btn.primary')?.click();return}if(e.key==='Enter'&&e.target.closest('#dlg')&&e.target.matches('input')){e.preventDefault();document.querySelector('#dlg .btn.primary')?.click();return}if(e.key==='Enter'&&e.target.matches('input[type=text]')){if(e.target.closest('#dlg')){return}const b=e.target.closest('.row')?.querySelector('.btn.primary,.btn[data-a^="add"],.btn[data-a="planAdd"],.btn[data-a="mxAddCol"]');if(b&&b.dataset.a&&(b.dataset.a.startsWith('add')||b.dataset.a==='planAdd'||b.dataset.a==='mxAddCol')){e.preventDefault();b.click()}}});
 /* ---------- bulut: hesap, onay, eşitleme ---------- */
@@ -1260,7 +1262,86 @@ async function cloudRefresh(){
   if(!SB||!AUTHU||VIEW||CLOUD.dirty||CLOUD.saving||OPT||PV||!document.getElementById('dlg').hidden||!document.getElementById('gate').hidden)return;
   try{const {data:p}=await SB.from('profiles').select('*').eq('id',AUTHU.id).maybeSingle();if(p){ME=p;const a=accessOf(p);if(a!=='ok'){showGate(a);return}}
     const {data:r}=await SB.from('coach_state').select('data,updated_at').eq('coach_id',AUTHU.id).maybeSingle();
-    if(r&&r.updated_at&&r.updated_at!==CLOUD.at&&r.data&&r.data.v===1&&!CLOUD.dirty){const ui=S.ui;CLOUD.at=r.updated_at;init(r.data);S.ui=Object.assign(S.ui,{view:ui.view,week:ui.week});render();toast('Başka cihazdaki değişiklikler alındı')}}catch(e){}}
+    if(r&&r.updated_at&&r.updated_at!==CLOUD.at&&r.data&&r.data.v===1&&!CLOUD.dirty){const ui=S.ui;CLOUD.at=r.updated_at;init(r.data);S.ui=Object.assign(S.ui,{view:ui.view,week:ui.week});render();toast('Başka cihazdaki değişiklikler alındı')}}catch(e){}
+  absorbOps()}
+
+/* öğrenci girişi: öğrenci kendi telefonundan yalnızca izinli kayıtları gönderir; koçun uygulaması bunları işler */
+let STUDENT=null,SQ=[],SNAP='',SAE=null;const STOK='k-kocluk-ogrenci',SYN={busy:false,timer:null,err:''},ABS={busy:false},SA={map:null,busy:false};
+const STUDENT_NO=new Set(['addBookLink','adoptBook','bookToSource','stuMode','coachMode']);
+const stuTok=()=>{try{return localStorage.getItem(STOK)||''}catch(e){return ''}};
+const _s=v=>typeof v==='string'?v:'',_n=v=>Math.max(0,Math.min(100000,Math.floor(+v||0)));
+function applyOp(s,o){
+  if(!s||!o||typeof o!=='object')return false;const sid=s.id,M=mxOf(s),cidOf=c=>(M.alias&&M.alias[c])||c;
+  switch(o.t){
+    case 'task.done':{const t=S.tasks.find(x=>x.id===o.id&&x.sid===sid);if(!t)return false;t.done=!!o.done;return true}
+    case 'task.extra':{const k=o.task;if(!k||typeof k.id!=='string'||!k.id||!/^\d{4}-\d{2}-\d{2}$/.test(_s(k.date)))return false;const ex=S.tasks.find(x=>x.id===k.id);if(ex&&(ex.sid!==sid||!ex.extra))return false;
+      const t={id:k.id.slice(0,40),sid,extra:true,date:k.date,subj:_s(k.subj),topic:_s(k.topic),topicName:_s(k.topicName).slice(0,120),text:_s(k.text).slice(0,300),target:_n(k.target),done:!!k.done,src:cidOf(_s(k.src)),tests:Array.isArray(k.tests)?k.tests.filter(Number.isInteger).slice(0,60):[]};
+      if(ex)Object.assign(ex,t);else S.tasks.push(t);return true}
+    case 'mx.add':{const name=_s(o.name).trim().slice(0,80),tid=_s(o.tid),cid=_s(o.cid);if(!name||!tid||!cid)return false;let col=M.cols.find(c=>c.id===cid)||M.cols.find(c=>nrm(c.name)===nrm(name));
+      if(!col){col={id:cid,name};M.cols.push(col)}else if(col.id!==cid)(M.alias||(M.alias={}))[cid]=col.id;
+      const cell=M.cells[tid]||(M.cells[tid]={});if(!cell[col.id])cell[col.id]=Array.from({length:Math.max(1,Math.min(20,_n(o.n)||1))},()=>({}));if(!s.sources.includes(col.name))s.sources.push(col.name);return true}
+    case 'mx.len':{const cell=M.cells[_s(o.tid)]?.[cidOf(_s(o.cid))];if(!cell)return false;const n=Math.min(60,_n(o.n));while(cell.length<n)cell.push({});return true}
+    case 'mx.set':{const tid=_s(o.tid),cid=cidOf(_s(o.cid)),cell=M.cells[tid]?.[cid],i=o.i;if(!cell||!Number.isInteger(i)||i<0||i>=cell.length)return false;
+      cell[i]={done:true,d:_n(o.d),y:_n(o.y),b:_n(o.b),asked:!!o.asked,date:/^\d{4}-\d{2}-\d{2}$/.test(_s(o.date))?o.date:iso(today())};
+      S.tasks.forEach(t=>{if(t.sid===sid&&t.topic===tid&&t.src===cid&&t.tests?.length&&t.tests.every(j=>!cell[j]||cell[j].done))t.done=true});return true}
+    case 'exam.save':{const ex=S.exams.find(e=>e.id===o.id&&e.sid===sid);if(!ex||ex.done||!Array.isArray(o.answers)||o.answers.length!==ex.sections.length)return false;
+      ex.sections.forEach((sec,si)=>{const a=o.answers[si],ok=LET.slice(0,sec.options||4);if(Array.isArray(a)&&a.length===sec.count)sec.answers=a.map(x=>typeof x==='string'&&x.length===1&&ok.includes(x)?x:null);sec.seconds=_n(Array.isArray(o.seconds)?o.seconds[si]:0)});
+      ex.durationSec=_n(o.durationSec);if(o.done===true)ex.done=true;return true}
+  }
+  return false}
+function applyOps(ops,sid){const s=S.students.find(x=>x.id===sid);let n=0;if(!s||!Array.isArray(ops))return 0;ops.forEach(o=>{try{if(applyOp(s,o))n++}catch(e){}});return n}
+function stuSnap(){const s=st();if(!s)return '{}';return JSON.stringify({tasks:S.tasks.filter(t=>t.sid===s.id),mx:mxOf(s),exams:S.exams.filter(e=>e.sid===s.id).map(e=>({id:e.id,done:!!e.done,durationSec:e.durationSec||0,a:e.sections.map(x=>x.answers),s:e.sections.map(x=>x.seconds||0)}))})}
+function stuDiff(prev,cur){const ops=[],J=JSON.stringify,pt={};(prev.tasks||[]).forEach(t=>pt[t.id]=t);
+  (cur.tasks||[]).forEach(t=>{const p=pt[t.id];if(t.extra){if(!p||J(p)!==J(t))ops.push({t:'task.extra',task:t})}else if(p&&!!p.done!==!!t.done)ops.push({t:'task.done',id:t.id,done:!!t.done})});
+  const pm=prev.mx||{cols:[],cells:{}},cm=cur.mx||{cols:[],cells:{}};
+  Object.keys(cm.cells||{}).forEach(tid=>Object.keys(cm.cells[tid]||{}).forEach(cid=>{const cell=cm.cells[tid][cid],pc=(pm.cells||{})[tid]?.[cid],col=(cm.cols||[]).find(c=>c.id===cid);if(!col)return;
+    if(!pc)ops.push({t:'mx.add',tid,cid,name:col.name,n:cell.length});else if(cell.length>pc.length)ops.push({t:'mx.len',tid,cid,n:cell.length});
+    cell.forEach((x,i)=>{if(x&&x.done&&J(x)!==J(pc&&pc[i]))ops.push({t:'mx.set',tid,cid,i,d:x.d,y:x.y,b:x.b,asked:!!x.asked,date:x.date})})}));
+  const pe={};(prev.exams||[]).forEach(e=>pe[e.id]=e);
+  (cur.exams||[]).forEach(e=>{const p=pe[e.id];if(p&&!p.done&&J(p)!==J(e))ops.push({t:'exam.save',id:e.id,answers:e.a,seconds:e.s,durationSec:e.durationSec,done:!!e.done})});
+  return ops}
+function stuSyncText(){return SYN.busy?'Gönderiliyor…':SYN.err?'Gönderilemedi, yeniden denenecek':SQ.length?'Gönderilecek…':'Tüm kayıtların gönderildi'}
+function stuLabel(){const e=document.getElementById('sync');if(e)e.textContent=stuSyncText()}
+function stuSync(){if(!STUDENT)return;const now=stuSnap();if(now===SNAP)return;let ops=[];try{ops=stuDiff(JSON.parse(SNAP||'{}'),JSON.parse(now))}catch(e){}SNAP=now;if(!ops.length)return;
+  let urgent=false;ops.forEach(o=>{if(o.t==='exam.save'){SQ=SQ.filter(q=>!(q.t==='exam.save'&&q.id===o.id));if(o.done)urgent=true}else urgent=true;SQ.push(o)});
+  try{localStorage.setItem(STOK+':q',JSON.stringify(SQ))}catch(e){}
+  if(urgent){clearTimeout(SYN.timer);SYN.timer=setTimeout(stuPush,700)}else if(!SYN.timer)SYN.timer=setTimeout(stuPush,15000);stuLabel()}
+async function stuPush(){clearTimeout(SYN.timer);SYN.timer=null;if(!STUDENT||SYN.busy||!SQ.length)return;SYN.busy=true;stuLabel();const batch=SQ.slice(0,50);let v=null,err=null;
+  try{const r=await SB.rpc('student_push',{p_token:STUDENT.tok,p_ops:batch});if(r.error)throw r.error;v=r.data||{}}catch(e){err=e}
+  SYN.busy=false;
+  if(err||!v.ok){if(v&&v.error==='session'){showGate('slogin','','Oturumun kapandı. Yeniden giriş yap.');try{localStorage.removeItem(STOK)}catch(e){}STUDENT=null;return}
+    if(v&&v.error==='inactive'){showGate('sinactive');return}
+    const first=!SYN.err;SYN.err='x';SYN.timer=setTimeout(stuPush,8000);if(first)toast('Gönderilemedi; bağlantını kontrol et, yeniden denenecek');stuLabel();return}
+  SYN.err='';SQ=SQ.filter(o=>!batch.includes(o));try{localStorage.setItem(STOK+':q',JSON.stringify(SQ))}catch(e){}stuLabel();
+  if(SQ.length){SYN.timer=setTimeout(stuPush,300);return}
+  if(batch.some(o=>o.t==='exam.save'&&o.done))studentRefresh(true)}
+async function studentEnter(tok,keep){if(!keep)showGate('loading');let v=null;
+  try{const r=await SB.rpc('student_view',{p_token:tok});if(r.error)throw r.error;v=r.data}catch(e){if(!keep)showGate('perror','',aerr(e));return}
+  if(!v||!v.ok||!v.data){if(keep&&!(v&&(v.error==='session'||v.error==='inactive')))return;if(v&&v.error==='inactive'){showGate('sinactive');return}
+    try{localStorage.removeItem(STOK)}catch(e){}STUDENT=null;showGate('slogin','',v&&v.error==='session'?'Oturumun kapandı. Yeniden giriş yap.':'Hesabın bulunamadı. Koçunla iletişime geç.');return}
+  (v.data.exams||[]).forEach(e=>(e.sections||[]).forEach(sec=>{if(!Array.isArray(sec.key))sec.key=Array(sec.count).fill(null);if(!Array.isArray(sec.topics))sec.topics=Array(sec.count).fill(null)}));
+  const ui=keep&&S?{view:S.ui.view,week:S.ui.week,examId:S.ui.examId,examMode:S.ui.examMode,cur:st()?.curId}:null;
+  AUTHU=null;ME=null;VIEW=null;PARENT=null;STUDENT={tok,coach:v.coach||'Koç',username:v.username||''};
+  init(v.data);applyOps(v.ops||[],v.data.active);S.stuMode=true;
+  if(!keep){try{const q=JSON.parse(localStorage.getItem(STOK+':q')||'[]');if(Array.isArray(q)&&q.length){SQ=q;applyOps(q,v.data.active)}}catch(e){}}
+  if(ui){Object.assign(S.ui,{view:ui.view,week:ui.week,examId:ui.examId,examMode:ui.examMode});if(ui.cur&&(st()?.curIds||[]).includes(ui.cur))st().curId=ui.cur}else S.ui.view='program';
+  SNAP=stuSnap();showApp();render();if(SQ.length)stuPush()}
+async function studentRefresh(force){if(!STUDENT||SQ.length||SYN.busy||OPT||PV||!document.getElementById('dlg').hidden||!document.getElementById('gate').hidden)return;
+  const a=document.activeElement;if(!force&&a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.closest('#main'))return;if(S.ui.editTask)return;await studentEnter(STUDENT.tok,true)}
+/* koç: öğrencilerin gönderdiği kayıtları kendi kayıtlarına işler */
+async function absorbOps(){if(!SB||!AUTHU||VIEW||PARENT||STUDENT||ABS.busy||OPT||!S)return;ABS.busy=true;
+  try{const r=await SB.from('student_ops').select('id,student_id,op').eq('coach_id',AUTHU.id).order('id').limit(1000);if(r.error)throw r.error;
+    if(r.data.length){let n=0;r.data.forEach(row=>{const s=S.students.find(x=>x.id===row.student_id);try{if(s&&applyOp(s,row.op))n++}catch(e){}});
+      try{localStorage.setItem(KEY+':'+AUTHU.id,JSON.stringify(S));localStorage.setItem(KEY+':pending:'+AUTHU.id,'1')}catch(e){}
+      CLOUD.dirty=true;await cloudSave();
+      if(!CLOUD.dirty&&!CLOUD.saving&&!CLOUD.err){const ids=r.data.map(x=>x.id);for(let i=0;i<ids.length;i+=200)await SB.from('student_ops').delete().in('id',ids.slice(i,i+200));
+        if(n){const a=document.activeElement;if(!(a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))&&document.getElementById('dlg').hidden&&!PV)render();toast(`Öğrencilerden ${n} yeni kayıt alındı`)}}}}
+  catch(e){}
+  ABS.busy=false}
+async function saLoad(){if(!SB||!AUTHU||VIEW)return;SA.busy=true;try{const r=await SB.from('student_accounts').select('student_id,username').eq('coach_id',AUTHU.id);if(r.error)throw r.error;SA.map={};r.data.forEach(x=>SA.map[x.student_id]=x.username)}catch(e){SA.map={}}
+  SA.busy=false;if(S.ui.view==='ogrenciler')render()}
+function saSuggest(name){const m={'ç':'c','ğ':'g','ı':'i','ö':'o','ş':'s','ü':'u'};const b=String(name||'').toLocaleLowerCase('tr').replace(/[çğıöşü]/g,c=>m[c]).replace(/[^a-z0-9]+/g,'.').replace(/^\.+|\.+$/g,'').slice(0,20)||'ogrenci';return b+(10+Math.floor(Math.random()*90))}
+function saPass(){const A2='abcdefghjkmnpqrstuvwxyz23456789',u=new Uint32Array(8);crypto.getRandomValues(u);return Array.from(u,x=>A2[x%A2.length]).join('')}
 
 /* veli bağlantısı */
 let PARENT=null;const PARENT_NAV=[['veli','Haftalık rapor'],['program','Haftalık program'],['denemeler','Denemeler'],['dagilim','Konu dağılımı'],['matris','Kaynak takibi']],PARENT_OK=new Set(['go','week','openExam','back','openPdf','pvClose','pvZoom','gateRetry']);
@@ -1283,7 +1364,7 @@ async function parentEnter(tok){showGate('loading');let v=null;
   try{const r=await SB.rpc('parent_view',{p_token:tok});if(r.error)throw r.error;v=r.data}catch(e){showGate('perror','',aerr(e));return}
   if(!v||!v.ok||!v.data){showGate(v&&v.error==='inactive'?'pinactive':'pnotfound');return}
   const keep=PARENT&&S?{view:S.ui.view,week:S.ui.week,cur:st()?.curId}:null;
-  AUTHU=null;ME=null;VIEW=null;PARENT={tok,coach:v.coach||'Koç'};init(v.data);S.stuMode=false;S.ui.view=keep?keep.view:'veli';S.ui.week=keep?keep.week:0;S.ui.examId=null;
+  AUTHU=null;ME=null;VIEW=null;PARENT={tok,coach:v.coach||'Koç'};init(v.data);applyOps(v.ops||[],v.data.active);S.stuMode=false;S.ui.view=keep?keep.view:'veli';S.ui.week=keep?keep.week:0;S.ui.examId=null;
   if(keep&&keep.cur&&(st()?.curIds||[]).includes(keep.cur))st().curId=keep.cur;
   showApp();render()}
 VIEWS.veli=()=>{
@@ -1321,13 +1402,15 @@ function renderGate(){
     inp=(id,lab,type,ac)=>`<label class="f"><span>${lab}</span><input type="${type}" id="${id}" autocomplete="${ac}"></label>`,out='<button class="btn" data-a="signOut">Çıkış yap</button>',again='<button class="btn primary" data-a="gateRetry">Yeniden dene</button>';
   const who=AUTHU?`<p class="muted">${esc(AUTHU.email||'')}</p>`:'';
   const body=m==='loading'?'<p class="muted">Yükleniyor…</p>'
-    :m==='login'?`<h2>Giriş yap</h2>${note}${inp('g-mail','E-posta','email','username')}${inp('g-pass','Şifre','password','current-password')}<button class="btn primary" data-a="gateLogin">Giriş yap</button><div class="gate-links"><button class="btn link" data-a="gateGo" data-m="signup">Hesap oluştur</button><button class="btn link" data-a="gateGo" data-m="forgot">Şifremi unuttum</button></div>`
+    :m==='login'?`<h2>Giriş yap</h2>${note}${inp('g-mail','E-posta','email','username')}${inp('g-pass','Şifre','password','current-password')}<button class="btn primary" data-a="gateLogin">Giriş yap</button><div class="gate-links"><button class="btn link" data-a="gateGo" data-m="signup">Hesap oluştur</button><button class="btn link" data-a="gateGo" data-m="forgot">Şifremi unuttum</button></div><button class="btn" data-a="gateGo" data-m="slogin">Öğrenci girişi</button>`
+    :m==='slogin'?`<h2>Öğrenci girişi</h2><p class="muted">Koçunun verdiği kullanıcı adı ve şifreyle gir.</p>${note}${inp('g-user','Kullanıcı adı','text','username')}${inp('g-pass','Şifre','password','current-password')}<button class="btn primary" data-a="gateStudent">Giriş yap</button><div class="gate-links"><button class="btn link" data-a="gateGo" data-m="login">Koç girişi</button></div>`
     :m==='signup'?`<h2>Koç hesabı oluştur</h2><p class="muted">Hesabın, yönetici onayladıktan sonra kullanıma açılır.</p>${note}${inp('g-name','Ad soyad','text','name')}${inp('g-mail','E-posta','email','username')}${inp('g-pass','Şifre (en az 8 karakter)','password','new-password')}<button class="btn primary" data-a="gateSignup">Hesap oluştur</button><div class="gate-links"><button class="btn link" data-a="gateGo" data-m="login">Zaten hesabım var</button></div>`
     :m==='forgot'?`<h2>Şifre sıfırlama</h2><p class="muted">E-postana bir sıfırlama bağlantısı göndereceğiz.</p>${note}${inp('g-mail','E-posta','email','username')}<button class="btn primary" data-a="gateForgot">Bağlantı gönder</button><div class="gate-links"><button class="btn link" data-a="gateGo" data-m="login">Girişe dön</button></div>`
     :m==='newpass'?`<h2>Yeni şifre belirle</h2>${note}${inp('g-pass','Yeni şifre (en az 8 karakter)','password','new-password')}<button class="btn primary" data-a="gateNewPass">Şifreyi kaydet</button>`
     :m==='pending'?`<h2>Onay bekleniyor</h2>${who}<p>Hesabın oluşturuldu. Yönetici onayladığında uygulamayı kullanmaya başlayabilirsin.</p>${note}<div class="row">${again}${out}</div>`
     :m==='frozen'?`<h2>Hesabın donduruldu</h2>${who}<p>Kayıtların silinmedi, yerinde duruyor. Yeniden açılması için yöneticiyle iletişime geç.</p>${note}<div class="row">${again}${out}</div>`
     :m==='expired'?`<h2>Üyelik süren doldu</h2>${who}<p>Kayıtların silinmedi, yerinde duruyor. Üyeliğini yenilemek için yöneticiyle iletişime geç.</p>${note}<div class="row">${again}${out}</div>`
+    :m==='sinactive'?`<h2>Şu an kullanılamıyor</h2><p>Hesabın geçici olarak kapalı. Koçunla iletişime geç.</p><div class="row"><button class="btn" data-a="stuLogout">Çıkış yap</button></div>`
     :m==='pnotfound'?`<h2>Bağlantı geçersiz</h2><p>Bu veli bağlantısı iptal edilmiş ya da hatalı. Koçunuzdan yeni bağlantı isteyin.</p>`
     :m==='pinactive'?`<h2>Şu an görüntülenemiyor</h2><p>Bu bağlantı geçici olarak kapalı. Lütfen koçunuzla iletişime geçin.</p>`
     :m==='perror'?`<h2>Bağlanılamadı</h2><p>Sunucuya ulaşılamadı. İnternet bağlantınızı kontrol edip yeniden deneyin.</p>${note}<div class="row">${again}</div>`
@@ -1340,21 +1423,22 @@ async function enter(user){
   ME=p;const a=accessOf(p);if(a!=='ok'){showGate(a);return}
   let row=null;try{const r=await SB.from('coach_state').select('data,updated_at').eq('coach_id',user.id).maybeSingle();if(r.error)throw r.error;row=r.data}catch(e){showGate('error','',aerr(e));return}
   let local=null;try{if(localStorage.getItem(KEY+':pending:'+user.id)){const o=JSON.parse(localStorage.getItem(KEY+':'+user.id));if(o&&o.v===1)local=o}}catch(e){}
-  VIEW=null;MYS=null;ADM.rows=null;PL.map=null;PARENT=null;CLOUD.at=row&&row.updated_at;CLOUD.err='';CLOUD.dirty=false;
-  if(local){init(local);cloudDirty()}else if(row&&row.data&&row.data.v===1)init(row.data);else{init(seed());showApp();render();save();return}
-  showApp();render()}
+  VIEW=null;MYS=null;ADM.rows=null;PL.map=null;PARENT=null;STUDENT=null;CLOUD.at=row&&row.updated_at;CLOUD.err='';CLOUD.dirty=false;
+  SA.map=null;if(local){init(local);cloudDirty()}else if(row&&row.data&&row.data.v===1)init(row.data);else{init(seed());showApp();render();save();return}
+  showApp();render();absorbOps()}
 async function boot(){
   if(!window.supabase||!window.supabase.createClient){showGate('error','','Uygulamanın bir parçası yüklenemedi. Sayfayı yenile.');return}
   SB=window.supabase.createClient(SB_URL,SB_KEY);
   if(PTOK){await parentEnter(PTOK);return}
+  if(stuTok()){await studentEnter(stuTok());return}
   SB.auth.onAuthStateChange((ev)=>{if(ev==='PASSWORD_RECOVERY')setTimeout(()=>showGate('newpass'),0)});
   let sess=null;try{sess=(await SB.auth.getSession()).data.session}catch(e){}
   if(GATE.mode==='newpass')return;
-  if(sess&&sess.user)await enter(sess.user);else showGate('login')}
+  if(sess&&sess.user)await enter(sess.user);else showGate(/ogrenci/.test(location.hash)?'slogin':'login')}
 
 Object.assign(A,{
   gateGo:el=>showGate(el.dataset.m),
-  gateRetry:async()=>{if(PTOK)await parentEnter(PTOK);else if(AUTHU)await enter(AUTHU);else await boot()},
+  gateRetry:async()=>{if(PTOK)await parentEnter(PTOK);else if(STUDENT||stuTok())await studentEnter(STUDENT?STUDENT.tok:stuTok());else if(AUTHU)await enter(AUTHU);else await boot()},
   plCreate:async()=>{const s=st();try{await plMake(s);commit('Veli bağlantısı oluşturuldu')}catch(e){toast(aerr(e))}},
   plCopy:()=>copyFrom('pl-url','Bağlantı kopyalandı'),
   plRenew:()=>{const s=st();ask('Emin misin?','Eski bağlantı hemen geçersiz olur; veliye yenisini göndermen gerekir.',async()=>{try{await plDrop(s);await plMake(s);commit('Yeni bağlantı oluşturuldu')}catch(e){toast(aerr(e));render()}})},
@@ -1368,6 +1452,31 @@ Object.assign(A,{
     try{const {error}=await SB.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname});if(error)throw error;showGate('login','Sıfırlama bağlantısı e-postana gönderildi.')}catch(e){showGate('forgot','',aerr(e))}},
   gateNewPass:async()=>{const password=val('g-pass');if(password.length<8){showGate('newpass','','Şifre en az 8 karakter olmalı.');return}showGate('loading');
     try{const {data,error}=await SB.auth.updateUser({password});if(error)throw error;await enter(data.user)}catch(e){showGate('newpass','',aerr(e))}},
+  stuLogout:async()=>{const t=STUDENT?STUDENT.tok:stuTok();if(STUDENT&&SQ.length){try{await stuPush()}catch(e){}}if(OPT)closeOptik();try{localStorage.removeItem(STOK)}catch(e){}if(t){try{await SB.rpc('student_logout',{p_token:t})}catch(e){}}STUDENT=null;SQ=[];showGate('slogin')},
+  gateStudent:async()=>{const u=val('g-user').trim(),pw=val('g-pass');if(!u||!pw){showGate('slogin','','Kullanıcı adını ve şifreni yaz.');return}showGate('loading');
+    try{const r=await SB.rpc('student_login',{p_username:u,p_password:pw});if(r.error)throw r.error;const v=r.data||{};
+      if(!v.ok){showGate('slogin','',v.error==='locked'?'Çok fazla hatalı deneme yapıldı. 10 dakika sonra tekrar dene.':v.error==='inactive'?'Hesabın şu an kullanıma kapalı. Koçunla iletişime geç.':'Kullanıcı adı ya da şifre yanlış.');return}
+      try{localStorage.setItem(STOK,v.token)}catch(e){}await studentEnter(v.token)}catch(e){showGate('slogin','',/student_login|schema|function/i.test(e.message||'')?'Öğrenci girişi henüz açılmamış. Koçuna haber ver.':aerr(e))}},
+  stuAcc:el=>{const x=S.students.find(q=>q.id===el.dataset.id);if(!x||!AUTHU||VIEW)return;if(SA.map===null){toast('Giriş bilgileri yükleniyor, birazdan tekrar dene');return}SAE={id:x.id};ASK=null;const cur=SA.map[x.id],d=document.getElementById('dlg');
+    d.innerHTML=`<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="dlg-t"><h2 id="dlg-t">Öğrenci girişi</h2><p class="muted">${esc(x.name)} ${cur?`şu an “${esc(cur)}” kullanıcı adıyla giriyor. Kaydedersen şifresi değişir ve açık oturumları kapanır.`:'için kullanıcı adı ve şifre belirle. Öğrenci kendi telefonundan bunlarla girer.'}</p>
+      <label class="f"><span>Kullanıcı adı (küçük harf, rakam, nokta)</span><input type="text" id="sa-user" autocomplete="off" autocapitalize="none" value="${esc(cur||saSuggest(x.name))}"></label>
+      <label class="f"><span>Şifre (en az 6 karakter)</span><input type="text" id="sa-pass" autocomplete="off" autocapitalize="none" value="${saPass()}"></label>
+      <div class="dlg-b">${cur?'<button class="btn link" data-a="saRemove">Girişi kaldır</button>':''}<button class="btn" data-a="askNo">Vazgeç</button><button class="btn primary" data-a="saSave">Kaydet</button></div></div>`;d.hidden=false;document.getElementById('sa-user').focus()},
+  saSave:async()=>{if(!SAE)return;const id=SAE.id,x=S.students.find(q=>q.id===id),u=val('sa-user').trim().toLowerCase(),pw=val('sa-pass');
+    if(!/^[a-z0-9._-]{3,30}$/.test(u)){toast('Kullanıcı adı 3–30 karakter olmalı; yalnızca küçük harf, rakam, nokta, tire');return}if(pw.length<6){toast('Şifre en az 6 karakter olmalı');return}
+    try{const r=await SB.rpc('coach_set_student_login',{p_student_id:id,p_username:u,p_password:pw});if(r.error)throw r.error;const v=r.data||{};
+      if(!v.ok){toast(v.error==='taken'?'Bu kullanıcı adı alınmış; başka bir ad dene':v.error==='username'?'Kullanıcı adı uygun değil':v.error==='password'?'Şifre en az 6 karakter olmalı':'Kaydedilemedi');return}
+      SA.map[id]=v.username;SAE=null;const d=document.getElementById('dlg');
+      d.innerHTML=`<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="dlg-t"><h2 id="dlg-t">Giriş bilgisi hazır</h2><p class="muted">Bunu ${esc(x?x.name:'öğrenci')} ile paylaş. Şifre bir daha gösterilmez; unutulursa buradan yenisini verirsin.</p>
+        <textarea id="sa-out" rows="5" readonly>k-Koçluk öğrenci girişi
+Adres: ${esc(location.origin+location.pathname+'#ogrenci')}
+Kullanıcı adı: ${esc(v.username)}
+Şifre: ${esc(pw)}</textarea>
+        <div class="dlg-b"><button class="btn" data-a="askNo">Kapat</button><button class="btn primary" data-a="saCopy">Kopyala</button></div></div>`;render()}
+    catch(e){toast(/coach_set_student_login|schema|function/i.test(e.message||'')?'Öğrenci girişi için 03 numaralı SQL dosyasını Supabase\'de çalıştırman gerekiyor':aerr(e))}},
+  saCopy:()=>copyFrom('sa-out','Giriş bilgisi kopyalandı'),
+  saRemove:()=>{if(!SAE)return;const id=SAE.id,x=S.students.find(q=>q.id===id);ask('Emin misin?',`${x?x.name:'Öğrenci'} artık kullanıcı adı ve şifresiyle giremeyecek. Kayıtları silinmez.`,async()=>{
+      try{const r=await SB.from('student_accounts').delete().eq('coach_id',AUTHU.id).eq('student_id',id);if(r.error)throw r.error;delete SA.map[id];commit('Öğrenci girişi kaldırıldı')}catch(e){toast(aerr(e))}})},
   signOut:async()=>{if(CLOUD.dirty&&!VIEW){try{await cloudSave()}catch(e){}}try{await SB.auth.signOut()}catch(e){}AUTHU=null;ME=null;VIEW=null;MYS=null;ADM.rows=null;closeOptik&&OPT&&closeOptik();showGate('login')},
   admLoad:()=>admLoad(true),
   admSet:async el=>{const id=el.dataset.id,f=el.dataset.f,v=el.dataset.v==='1';await admUpdate(id,{[f]:v},f==='approved'?(v?'Koç onaylandı':'Onay kaldırıldı'):(v?'Hesap donduruldu':'Dondurma kaldırıldı'))},
@@ -1378,7 +1487,7 @@ Object.assign(A,{
   admDel:el=>{const row=(ADM.rows||[]).find(r=>r.id===el.dataset.id);if(!row)return;ask('Emin misin?',`“${row.full_name||row.email}” adlı koç ve tüm kayıtları (öğrenciler, planlar, denemeler) kalıcı olarak silinecek. Bu işlem geri alınamaz.`,async()=>{
       try{const r=await SB.rpc('admin_delete_coach',{target:row.id});if(r.error)throw r.error;toast(String(r.data||'Silindi'));await admLoad(true)}catch(e){toast(aerr(e))}})}
 });
-STU_DENY.add('admDel');STU_DENY.add('plRevoke');STU_DENY.add('plRenew');['admSet','admView','admLoad','signOut'].forEach(x=>STU_COACH.add(x));
+STU_DENY.add('admDel');STU_DENY.add('saRemove');['stuAcc','saSave'].forEach(x=>STU_COACH.add(x));STU_DENY.add('plRevoke');STU_DENY.add('plRenew');['admSet','admView','admLoad','signOut'].forEach(x=>STU_COACH.add(x));
 Object.assign(C,{
   admField:async el=>{const f=el.dataset.f;await admUpdate(el.dataset.id,{[f]:f==='paid_until'?(el.value||null):el.value},f==='paid_until'?'Üyelik tarihi kaydedildi':'Not kaydedildi')}
 });
@@ -1407,8 +1516,9 @@ VIEWS.yonetici=()=>{
       ${me?'<span class="muted">Bu senin hesabın</span>':`<button class="btn sm" data-a="admView" data-id="${r.id}">Kayıtlarını gör</button>`}
       ${adm?'':`<button class="btn sm link" data-a="admDel" data-id="${r.id}">Kalıcı sil</button>`}</div></article>`}).join('')}</section>`;
 };
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){if(CLOUD.dirty)cloudSave()}else if(PARENT){if(document.getElementById('gate').hidden&&!PV)parentEnter(PARENT.tok)}else cloudRefresh()});
-window.addEventListener('pagehide',()=>{if(CLOUD.dirty)cloudSave()});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){if(CLOUD.dirty)cloudSave()}else if(PARENT){if(document.getElementById('gate').hidden&&!PV)parentEnter(PARENT.tok)}else if(STUDENT)studentRefresh();else cloudRefresh()});
+setInterval(()=>{if(document.visibilityState==='visible'){if(STUDENT)studentRefresh();else absorbOps()}},45000);
+window.addEventListener('pagehide',()=>{if(STUDENT){if(SQ.length)stuPush()}else if(CLOUD.dirty)cloudSave()});
 const PTOK=(location.hash.match(/veli=([a-f0-9]{32,})/)||[])[1]||'';
 ASREADY=true;
 boot();
