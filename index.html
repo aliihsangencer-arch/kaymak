@@ -91,7 +91,7 @@ main{padding-block:28px 72px;padding-inline:clamp(16px,3.2vw,44px);min-width:0;d
 .row{display:flex;flex-wrap:wrap;gap:10px;align-items:end}
 .f{display:flex;flex-direction:column;gap:4px;min-width:0}
 .f > span{font-size:12px;color:var(--muted)}
-input[type=text],input[type=number],input[type=date],input[type=email],input[type=tel],select,textarea{background:var(--surface-2);border:1px solid var(--line);border-radius:7px;padding:7px 9px;min-width:0;max-width:100%}
+input[type=text],input[type=number],input[type=date],input[type=time],input[type=password],input[type=email],input[type=tel],select,textarea{background:var(--surface-2);border:1px solid var(--line);border-radius:7px;padding:7px 9px;min-width:0;max-width:100%}
 textarea{width:100%;resize:vertical}
 input[type=number]{width:84px}
 .w-s{width:110px}.w-m{width:170px}.w-l{width:240px}.grow{flex:1 1 200px}
@@ -243,6 +243,9 @@ body.pmode main input,body.pmode main select,body.pmode main textarea,body.pmode
 .gate-links{display:flex;flex-wrap:wrap;gap:6px 14px;justify-content:space-between}
 .banner{background:var(--warn-soft);border:1px solid var(--warn);color:var(--ink);border-radius:10px;padding:10px 14px;display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;justify-content:space-between}
 .adm{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr));gap:12px}
+.lesson{background:var(--surface-2);border-radius:7px;padding:7px 8px;font-size:13px;display:flex;flex-direction:column;gap:4px;box-shadow:inset 3px 0 0 var(--accent)}
+.lesson.done{box-shadow:inset 3px 0 0 var(--ok)}
+.lesson b{font-weight:600}
 .dlg-bg{position:fixed;inset:0;z-index:70;background:rgba(10,12,16,.45);display:grid;place-items:center;padding:16px}
 .dlg{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px;max-width:400px;width:100%;display:flex;flex-direction:column;gap:12px;box-shadow:0 10px 40px rgba(0,0,0,.25)}
 .dlg-b{display:flex;gap:10px;justify-content:flex-end}
@@ -338,7 +341,7 @@ function seed(){
 /* ---------- durum ---------- */
 function load(){try{const r=localStorage.getItem(KEY);if(r){const o=JSON.parse(r);if(o&&o.v===1)return o}}catch(e){}return seed()}
 function DEF_EXAM(){const t=today();const y=t.getMonth()>=6?t.getFullYear()+1:t.getFullYear();return `${y}-06-06`}
-function migrate(o){o.plans=o.plans||{};o.books=Array.isArray(o.books)?o.books:[];o.progress=o.progress||{};(o.students||[]).forEach(s=>{if(!s.startDate)s.startDate=iso(mondayOf(today()));if(!s.examDate)s.examDate=DEF_EXAM();if(s.reviewWeeks==null)s.reviewWeeks=2;if(!Array.isArray(s.curIds))s.curIds=s.curId?[s.curId]:[];if(s.curId&&!s.curIds.includes(s.curId))s.curIds.unshift(s.curId);if(s.planBuilt&&s.planEdited==null)s.planEdited=true});return o}
+function migrate(o){o.lessons=Array.isArray(o.lessons)?o.lessons:[];o.fees=Array.isArray(o.fees)?o.fees:[];o.plans=o.plans||{};o.books=Array.isArray(o.books)?o.books:[];o.progress=o.progress||{};(o.students||[]).forEach(s=>{if(!s.startDate)s.startDate=iso(mondayOf(today()));if(!s.examDate)s.examDate=DEF_EXAM();if(s.reviewWeeks==null)s.reviewWeeks=2;if(!Array.isArray(s.curIds))s.curIds=s.curId?[s.curId]:[];if(s.curId&&!s.curIds.includes(s.curId))s.curIds.unshift(s.curId);if(s.planBuilt&&s.planEdited==null)s.planEdited=true});return o}
 function init(o){S=migrate(o);S.ui=Object.assign({view:'ozet',week:0,examId:null,examMode:null,curId:null,editStudent:null,editTask:null,openSec:0},S.ui||{});
   S.students.forEach(s=>{if(!s.autoPlan)return;delete s.autoPlan;
     const cur=curOf(s),W=plan(s.id).weeks,past=planWeeks(s).filter(k=>k<curMon());
@@ -898,6 +901,83 @@ VIEWS.matris=()=>{
     </div></details>`}).join('')}`;
 };
 
+/* ---------- koçun ders programı ve ücret takibi (öğrenci ve veliye gönderilmez) ---------- */
+const stuName=(sid,fallback)=>S.students.find(x=>x.id===sid)?.name||(fallback?fallback+' (silinmiş)':'—');
+const money=v=>(+v||0).toLocaleString('tr-TR',{style:'currency',currency:'TRY',minimumFractionDigits:0,maximumFractionDigits:2});
+const coachHead=(title,right='')=>`<header class="ph"><div><p class="eyebrow">Koç · tüm öğrenciler</p><h1>${title}</h1></div><div class="ph-r">${right}</div></header>`;
+const endTime=(t,min)=>{const [h,m]=String(t||'0:0').split(':').map(Number),x=(h*60+m+(+min||0))%1440;return pad(Math.floor(x/60))+':'+pad(x%60)};
+const hoursTxt=min=>{const h=Math.floor(min/60),m=min%60;return h?(m?`${h} sa ${m} dk`:`${h} sa`):`${m} dk`};
+const stuOpts=sel=>S.students.map(x=>`<option value="${x.id}" ${x.id===sel?'selected':''}>${esc(x.name)}</option>`).join('');
+VIEWS.dersler=()=>{
+  const w=weekRange(S.ui.week),tI=iso(today()),ls=S.lessons.filter(l=>inR(l.date,w)).sort((a,b)=>(a.date+a.time<b.date+b.time?-1:1));
+  const tot=sum(ls,'min'),dn=ls.filter(l=>l.done);
+  const days=DAYS.map((n,i)=>{const d=iso(addDays(w.mon,i)),x=ls.filter(l=>l.date===d);
+    return `<div class="day ${d===tI?'today':''}"><div class="day-h"><b>${n}</b><small class="num">${fmt(d)}</small></div>${x.length?x.map(l=>`<div class="lesson ${l.done?'done':''}"><span class="num"><b>${esc(l.time)}–${endTime(l.time,l.min)}</b> · ${l.min} dk</span><span>${esc(stuName(l.sid,l.name))}</span>${l.note?`<small>${esc(l.note)}</small>`:''}
+      <span class="row" style="gap:8px;align-items:center"><label style="display:flex;gap:5px;align-items:center;cursor:pointer"><input type="checkbox" data-c="lessonDone" data-id="${l.id}" ${l.done?'checked':''}>Yapıldı</label><button class="btn sm link" data-a="lessonEdit" data-id="${l.id}">Düzenle</button>${delBtn('lesson',l.id)}</span></div>`).join(''):'<p class="empty" style="font-size:13px">Ders yok</p>'}</div>`}).join('');
+  return `${coachHead('Ders programım',weekNav())}
+  <section class="tiles">
+    <div class="tile"><span class="k">Bu hafta ders</span><span class="v">${ls.length}</span><span class="s">${new Set(ls.map(l=>l.sid)).size} öğrenci</span></div>
+    <div class="tile"><span class="k">Toplam süre</span><span class="v" style="font-size:22px">${hoursTxt(tot)}</span><span class="s">planlanan</span></div>
+    <div class="tile"><span class="k">Yapılan</span><span class="v">${dn.length}/${ls.length}</span><span class="s">${hoursTxt(sum(dn,'min'))}</span></div>
+  </section>
+  <section class="card"><div class="card-h"><h2>Ders ekle</h2><small>Geçmiş ya da gelecek herhangi bir tarihe ekleyebilirsin</small></div>
+    ${S.students.length?`<div class="row">
+      <label class="f"><span>Öğrenci</span><select id="ls-sid" class="w-l">${stuOpts(st()?.id)}</select></label>
+      <label class="f"><span>Tarih</span><input type="date" id="ls-date" value="${inR(tI,w)?tI:w.a}"></label>
+      <label class="f"><span>Saat</span><input type="time" id="ls-time" value="17:00"></label>
+      <label class="f"><span>Süre (dk)</span><input type="number" id="ls-min" min="10" max="600" step="5" value="60" inputmode="numeric"></label>
+      <label class="f"><span>Kaç hafta tekrarlansın</span><input type="number" id="ls-rep" min="1" max="52" value="1" inputmode="numeric"></label>
+      <label class="f grow"><span>Not</span><input type="text" id="ls-note" placeholder="Örn. Matematik, yüz yüze"></label>
+      <button class="btn primary" data-a="addLesson">Ekle</button>
+    </div>
+    <div class="row" style="justify-content:space-between;align-items:center"><small>“Kaç hafta” 1 ise yalnızca o güne eklenir; 12 yazarsan aynı gün ve saatte 12 hafta boyunca eklenir.</small><button class="btn sm" data-a="copyLessons">Önceki haftanın derslerini bu haftaya kopyala</button></div>`:'<p class="empty">Ders eklemek için önce Öğrenciler sayfasından öğrenci ekle.</p>'}
+  </section>
+  <section class="week">${days}</section>`;
+};
+const feePaid=f=>sum(f.payments||[],'amount'),feeLeft=f=>Math.max(0,(+f.amount||0)-feePaid(f));
+function feeStatus(f){const left=feeLeft(f),t=iso(today()),soon=iso(addDays(today(),7)),part=feePaid(f)>0&&left>0?' · kısmen ödendi':'';
+  return left<=0?['ok','Ödendi']:f.due<t?['bad','Vadesi geçti'+part]:f.due<=soon?['warn','Vadesi yakın'+part]:['mut','Bekliyor'+part]}
+VIEWS.ucretler=()=>{
+  const t=iso(today()),soon=iso(addDays(today(),7)),ym=t.slice(0,7),F=S.fees,ui=S.ui;
+  const open=F.filter(f=>feeLeft(f)>0),over=open.filter(f=>f.due<t),near=open.filter(f=>f.due>=t&&f.due<=soon);
+  const got=F.flatMap(f=>f.payments||[]).filter(p=>String(p.date).slice(0,7)===ym);
+  const flt=ui.feeF||'open',fs=ui.feeS||'';
+  const list=F.filter(f=>(!fs||f.sid===fs)&&(flt==='all'||(flt==='open'&&feeLeft(f)>0)||(flt==='over'&&feeLeft(f)>0&&f.due<t)||(flt==='paid'&&feeLeft(f)<=0))).sort((a,b)=>a.due<b.due?-1:a.due>b.due?1:0);
+  const per={};F.forEach(f=>{const k=f.sid;const x=per[k]||(per[k]={sid:k,name:f.name,amount:0,paid:0,over:0});x.amount+=+f.amount||0;x.paid+=feePaid(f);if(feeLeft(f)>0&&f.due<t)x.over+=feeLeft(f)});
+  return `${coachHead('Ücretler')}
+  <section class="tiles">
+    <div class="tile"><span class="k">Bu ay alınan</span><span class="v" style="font-size:22px">${money(sum(got,'amount'))}</span><span class="s">${got.length} ödeme</span></div>
+    <div class="tile"><span class="k">Vadesi geçen</span><span class="v ${over.length?'down':''}" style="font-size:22px">${money(over.reduce((a,f)=>a+feeLeft(f),0))}</span><span class="s">${over.length} kayıt</span></div>
+    <div class="tile"><span class="k">7 gün içinde vadesi gelen</span><span class="v" style="font-size:22px">${money(near.reduce((a,f)=>a+feeLeft(f),0))}</span><span class="s">${near.length} kayıt</span></div>
+    <div class="tile"><span class="k">Toplam alacak</span><span class="v" style="font-size:22px">${money(open.reduce((a,f)=>a+feeLeft(f),0))}</span><span class="s">${open.length} açık kayıt</span></div>
+  </section>
+  <section class="card"><div class="card-h"><h2>Ücret ekle</h2><small>Alacağın tutarı ve vade tarihini gir; ödeme gelince “Ödeme al”a bas</small></div>
+    ${S.students.length?`<div class="row">
+      <label class="f"><span>Öğrenci</span><select id="fe-sid" class="w-l">${stuOpts(fs||st()?.id)}</select></label>
+      <label class="f"><span>Tutar (TL)</span><input type="number" id="fe-amount" min="0" step="50" inputmode="decimal" style="width:110px"></label>
+      <label class="f"><span>Vade tarihi</span><input type="date" id="fe-due" value="${t}"></label>
+      <label class="f"><span>Kaç ay tekrarlansın</span><input type="number" id="fe-rep" min="1" max="36" value="1" inputmode="numeric"></label>
+      <label class="f grow"><span>Açıklama</span><input type="text" id="fe-note" placeholder="Örn. Ekim ayı koçluk ücreti"></label>
+      <button class="btn primary" data-a="addFee">Ekle</button>
+    </div><small class="muted">“Kaç ay” 1 ise tek kayıt eklenir; 9 yazarsan aynı tutarla, her ay aynı gün vadeli 9 kayıt eklenir.</small>`:'<p class="empty">Ücret eklemek için önce Öğrenciler sayfasından öğrenci ekle.</p>'}
+  </section>
+  <section class="card"><div class="card-h"><h2>Kayıtlar</h2><div class="row" style="gap:8px">
+      <select data-c="feeFilter" data-f="feeF" aria-label="Durum">${opts([['open','Ödenmeyenler'],['over','Vadesi geçenler'],['paid','Ödenenler'],['all','Tümü']],flt)}</select>
+      <select data-c="feeFilter" data-f="feeS" aria-label="Öğrenci"><option value="">Tüm öğrenciler</option>${stuOpts(fs)}</select></div></div>
+    ${list.length?`<div class="tw"><table class="t"><thead><tr><th>Öğrenci</th><th>Açıklama</th><th>Vade</th><th class="r">Tutar</th><th class="r">Ödenen</th><th class="r">Kalan</th><th>Durum</th><th></th></tr></thead><tbody>
+    ${list.map(f=>{const [c,l]=feeStatus(f),left=feeLeft(f);return `<tr><td>${esc(stuName(f.sid,f.name))}</td><td>${esc(f.note||'—')}</td><td class="num" style="white-space:nowrap">${parse(f.due).toLocaleDateString('tr-TR',{day:'numeric',month:'short',year:'numeric'})}</td><td class="r num">${money(f.amount)}</td><td class="r num">${money(feePaid(f))}</td><td class="r num"><b>${money(left)}</b></td><td><span class="pill ${c}">${l}</span></td>
+      <td><div class="row" style="gap:6px;flex-wrap:nowrap">${left>0?`<button class="btn sm primary" data-a="feePay" data-id="${f.id}">Ödeme al</button>`:''}${(f.payments||[]).length?`<button class="btn sm link" data-a="feeUndo" data-id="${f.id}">Son ödemeyi geri al</button>`:''}${delBtn('fee',f.id)}</div></td></tr>`}).join('')}
+    </tbody></table></div>`:'<p class="empty">Bu görünümde kayıt yok.</p>'}
+  </section>
+  <section class="card"><div class="card-h"><h2>Öğrenci bazında</h2><small>Tüm kayıtların toplamı</small></div>
+    ${Object.keys(per).length?`<div class="tw"><table class="t"><thead><tr><th>Öğrenci</th><th class="r">Toplam</th><th class="r">Ödenen</th><th class="r">Kalan</th><th class="r">Vadesi geçen</th></tr></thead><tbody>
+    ${Object.values(per).sort((a,b)=>(b.amount-b.paid)-(a.amount-a.paid)).map(x=>`<tr><td>${esc(stuName(x.sid,x.name))}</td><td class="r num">${money(x.amount)}</td><td class="r num">${money(x.paid)}</td><td class="r num"><b>${money(Math.max(0,x.amount-x.paid))}</b></td><td class="r num ${x.over?'down':''}">${money(x.over)}</td></tr>`).join('')}
+    </tbody><tfoot><tr><td>Toplam</td><td class="r num">${money(sum(F,'amount'))}</td><td class="r num">${money(F.reduce((a,f)=>a+feePaid(f),0))}</td><td class="r num">${money(open.reduce((a,f)=>a+feeLeft(f),0))}</td><td class="r num">${money(over.reduce((a,f)=>a+feeLeft(f),0))}</td></tr></tfoot></table></div>`:'<p class="empty">Henüz ücret kaydı yok.</p>'}
+  </section>`;
+};
+let LSE=null,FEE=null;
+function addMonths(d,n){const x=new Date(d.getFullYear(),d.getMonth()+n,1),last=new Date(x.getFullYear(),x.getMonth()+1,0).getDate();x.setDate(Math.min(d.getDate(),last));return x}
+
 /* ---------- PDF kitaplar ---------- */
 let AS=null,ASREADY=false,ASU=null,ASL=null,LIM=45*1048576;const BK={busy:false,msg:''};
 const mb=b=>(b/1048576).toLocaleString('tr-TR',{maximumFractionDigits:1})+' MB';
@@ -998,7 +1078,7 @@ VIEWS.yedek=()=>`${head('Yedek ve veriler')}
   </div>`;
 
 /* ---------- çizim ---------- */
-const NAV=[['ozet','Özet'],['program','Haftalık program'],['plan','Konu planı'],['dagilim','Konu dağılımı'],['konular','Konu ve kaynak'],['matris','Kaynak takibi'],['kitaplar','PDF kitaplar'],['sorular','Soru takibi'],['denemeler','Denemeler'],['cikmis','Çıkmış sorular'],['rapor','Veli raporu'],['ogrenciler','Öğrenciler'],['mufredat','Müfredat'],['yedek','Yedek']];
+const NAV=[['ozet','Özet'],['program','Haftalık program'],['plan','Konu planı'],['dagilim','Konu dağılımı'],['konular','Konu ve kaynak'],['matris','Kaynak takibi'],['kitaplar','PDF kitaplar'],['sorular','Soru takibi'],['denemeler','Denemeler'],['cikmis','Çıkmış sorular'],['rapor','Veli raporu'],['dersler','Ders programım'],['ucretler','Ücretler'],['ogrenciler','Öğrenciler'],['mufredat','Müfredat'],['yedek','Yedek']];
 const STU_VIEWS=['program','dagilim','matris','denemeler','kitaplar'],STU_DENY=new Set(['resetExam','del','mxMinus','mxClear','pastRm','clearPlan','resetAll','restore']),STU_COACH=new Set(['optPause','openPlan','copyWeek','newExam','setKey','pasteKey','bulkTopic','addSec']);
 function render(){
   document.body.classList.toggle('pmode',!!PARENT);if(PARENT&&!PARENT_NAV.some(([v])=>v===S.ui.view))S.ui.view='veli';
@@ -1149,6 +1229,31 @@ const A={
     cell[MXE.i]={done:true,d,y,b,asked:document.getElementById('mx-a').checked,date:iso(today())};
     S.tasks.forEach(t=>{if(t.sid===st().id&&t.topic===MXE.tid&&t.src===MXE.cid&&t.tests?.length&&t.tests.every(i=>!cell[i]||cell[i].done))t.done=true});MXE=null;closeAsk();mxCommit('Test kaydedildi')},
   mxClear:()=>{if(!MXE)return;const cell=mxOf(st()).cells[MXE.tid]?.[MXE.cid];if(cell)cell[MXE.i]={};MXE=null;closeAsk();mxCommit('İşaret kaldırıldı')},
+  addLesson:()=>{const sid=val('ls-sid'),date=val('ls-date'),time=val('ls-time'),min=Math.max(10,Math.min(600,Math.floor(+val('ls-min')||0))),rep=Math.max(1,Math.min(52,Math.floor(+val('ls-rep')||1))),x=S.students.find(q=>q.id===sid);
+    if(!x){toast('Öğrenciyi seç');return}if(!date||!/^\d{2}:\d{2}/.test(time)){toast('Tarihi ve saati gir');return}
+    for(let i=0;i<rep;i++)S.lessons.push({id:uid(),sid,name:x.name,date:iso(addDays(parse(date),i*7)),time:time.slice(0,5),min,note:val('ls-note').trim(),done:false});
+    commit(rep>1?`${rep} haftaya ders eklendi`:'Ders eklendi')},
+  copyLessons:()=>{const w=weekRange(S.ui.week),p=weekRange(S.ui.week-1),src=S.lessons.filter(l=>inR(l.date,p));if(!src.length){toast('Önceki haftada ders yok');return}
+    let n=0;src.forEach(l=>{const d=iso(addDays(parse(l.date),7));if(!S.lessons.some(q=>q.sid===l.sid&&q.date===d&&q.time===l.time)){S.lessons.push(Object.assign({},l,{id:uid(),date:d,done:false}));n++}});commit(n?`${n} ders kopyalandı`:'Bu haftada aynı dersler zaten var')},
+  lessonEdit:el=>{const l=S.lessons.find(q=>q.id===el.dataset.id);if(!l)return;LSE={id:l.id};ASK=null;const d=document.getElementById('dlg');
+    d.innerHTML=`<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="dlg-t"><h2 id="dlg-t">Dersi düzenle</h2>
+      <label class="f"><span>Öğrenci</span><select id="le-sid">${stuOpts(l.sid)}</select></label>
+      <div class="row"><label class="f"><span>Tarih</span><input type="date" id="le-date" value="${esc(l.date)}"></label><label class="f"><span>Saat</span><input type="time" id="le-time" value="${esc(l.time)}"></label><label class="f"><span>Süre (dk)</span><input type="number" id="le-min" min="10" max="600" step="5" value="${l.min}"></label></div>
+      <label class="f"><span>Not</span><input type="text" id="le-note" value="${esc(l.note||'')}"></label>
+      <div class="dlg-b"><button class="btn" data-a="askNo">Vazgeç</button><button class="btn primary" data-a="lessonSave">Kaydet</button></div></div>`;d.hidden=false;document.getElementById('le-date').focus()},
+  lessonSave:()=>{const l=LSE&&S.lessons.find(q=>q.id===LSE.id);if(!l)return closeAsk();const date=val('le-date'),time=val('le-time'),x=S.students.find(q=>q.id===val('le-sid'));if(!date||!/^\d{2}:\d{2}/.test(time)){toast('Tarihi ve saati gir');return}
+    Object.assign(l,{date,time:time.slice(0,5),min:Math.max(10,Math.min(600,Math.floor(+val('le-min')||l.min))),note:val('le-note').trim()});if(x){l.sid=x.id;l.name=x.name}closeAsk();commit('Ders güncellendi')},
+  addFee:()=>{const sid=val('fe-sid'),amount=Math.round((+val('fe-amount')||0)*100)/100,due=val('fe-due'),rep=Math.max(1,Math.min(36,Math.floor(+val('fe-rep')||1))),note=val('fe-note').trim(),x=S.students.find(q=>q.id===sid);
+    if(!x){toast('Öğrenciyi seç');return}if(!(amount>0)){toast('Tutarı gir');return}if(!due){toast('Vade tarihini gir');return}
+    for(let i=0;i<rep;i++)S.fees.push({id:uid(),sid,name:x.name,amount,due:iso(addMonths(parse(due),i)),note,payments:[]});
+    commit(rep>1?`${rep} aylık ücret kaydı eklendi`:'Ücret kaydı eklendi')},
+  feePay:el=>{const f=S.fees.find(q=>q.id===el.dataset.id);if(!f)return;FEE={id:f.id};ASK=null;const d=document.getElementById('dlg');
+    d.innerHTML=`<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="dlg-t"><h2 id="dlg-t">Ödeme al</h2><p class="muted">${esc(stuName(f.sid,f.name))}${f.note?' · '+esc(f.note):''} · kalan ${money(feeLeft(f))}</p>
+      <div class="row"><label class="f"><span>Alınan tutar (TL)</span><input type="number" id="fp-amount" min="0" step="50" inputmode="decimal" style="width:130px" value="${feeLeft(f)}"></label><label class="f"><span>Ödeme tarihi</span><input type="date" id="fp-date" value="${iso(today())}"></label></div>
+      <div class="dlg-b"><button class="btn" data-a="askNo">Vazgeç</button><button class="btn primary" data-a="feePaySave">Kaydet</button></div></div>`;d.hidden=false;document.getElementById('fp-amount').focus()},
+  feePaySave:()=>{const f=FEE&&S.fees.find(q=>q.id===FEE.id);if(!f)return closeAsk();const a=Math.round((+val('fp-amount')||0)*100)/100,date=val('fp-date')||iso(today());if(!(a>0)){toast('Tutarı gir');return}if(a>feeLeft(f)+0.001){toast('Tutar kalan borçtan büyük olamaz');return}
+    (f.payments||(f.payments=[])).push({amount:a,date});closeAsk();commit(feeLeft(f)<=0?'Ödeme alındı · kayıt kapandı':'Kısmi ödeme alındı')},
+  feeUndo:el=>{const f=S.fees.find(q=>q.id===el.dataset.id);if(!f||!(f.payments||[]).length)return;const p=f.payments[f.payments.length-1];ask('Emin misin?',`${fmt(p.date)} tarihli ${money(p.amount)} tutarındaki ödeme kaydı silinecek.`,()=>{f.payments.pop();commit('Son ödeme geri alındı')})},
   addPastYear:()=>{const y=val('py-year').trim(),P=pastOf(curOf(st()));if(!y){toast('Yılı yaz');return}if(P.years.includes(y)){toast('Bu yıl zaten var');return}P.years.push(y);P.years.sort();commit('Yıl eklendi')},
   resetExam:el=>{const ex=S.exams.find(e=>e.id===el.dataset.id);if(!ex)return;ask('Emin misin?',`“${ex.name}” denemesindeki tüm işaretlemeler ve süre silinecek; deneme hiç açılmamış gibi olur. Cevap anahtarı, konu eşlemesi ve PDF korunur.`,()=>{ex.done=false;ex.durationSec=0;ex.sections.forEach(x=>{x.answers=Array(x.count).fill(null);x.seconds=0});S.ui.examId=null;S.ui.examMode=null;commit('Deneme sıfırlandı')})},
   openPdf:el=>openPdf(el.dataset.id,el.dataset.t||'PDF'),
@@ -1161,7 +1266,7 @@ let ASK=null;
 function ask(title,detail,yes){ASK=yes;const d=document.getElementById('dlg');
   d.innerHTML=`<div class="dlg" role="alertdialog" aria-modal="true" aria-labelledby="dlg-t" aria-describedby="dlg-d"><h2 id="dlg-t">${esc(title)}</h2>${detail?`<p id="dlg-d" class="muted">${esc(detail)}</p>`:''}<div class="dlg-b"><button class="btn danger" data-a="askYes">Evet</button><button class="btn" data-a="askNo">Hayır</button></div></div>`;
   d.hidden=false;d.querySelector('[data-a="askNo"]').focus()}
-function closeAsk(){ASK=null;MXE=null;SAE=null;const d=document.getElementById('dlg');d.hidden=true;d.innerHTML=''}
+function closeAsk(){ASK=null;MXE=null;SAE=null;LSE=null;FEE=null;const d=document.getElementById('dlg');d.hidden=true;d.innerHTML=''}
 const DELPRE={
   cur:id=>S.students.some(s=>s.curId===id||(s.curIds||[]).includes(id))?'Bu müfredatı kullanan öğrenci var; önce öğrencinin müfredatını değiştir':''
 };
@@ -1169,12 +1274,14 @@ const DELD={
   cur:id=>`“${curById(id)?.name||''}” müfredatı, içindeki tüm ders ve konularla birlikte silinecek.`,
   subject:id=>{const c=curById(S.ui.curId)||S.curricula[0];return `“${subj(c,id)?.name||''}” dersi ve içindeki tüm konular silinecek.`},
   topic:x=>{const [sid,tid]=x.split('|');const c=curById(S.ui.curId)||S.curricula[0];return `“${subj(c,sid)?.topics.find(t=>t.id===tid)?.name||''}” konusu müfredattan silinecek.`},
-  student:id=>`“${S.students.find(s=>s.id===id)?.name||''}” ve tüm kayıtları (program, plan, soru, deneme) silinecek.`,
+  student:id=>`“${S.students.find(s=>s.id===id)?.name||''}” ve tüm kayıtları (program, plan, soru, deneme) silinecek. Ders programındaki ve ücretlerdeki kayıtları adıyla birlikte kalır.`,
   plan:x=>{const s=st(),f=findItem(s,x);return `“${f.it?itemName(curOf(s),f.it):''}” bu haftanın planından çıkarılacak.`},
   task:()=>'Görev programdan silinecek.',
   book:id=>{const b=S.books.find(x=>x.id===id);return b?.files.length?`“${b.name}” kitabının PDF dosyası kalıcı olarak silinecek.`:`“${b?.name||''}” listeden çıkarılacak; bağlantıdaki dosyaya dokunulmaz.`},
   orphan:()=>'Bu PDF dosyası kalıcı olarak silinecek.',
   mxCol:x=>{const [sid,cid]=x.split('|'),s=st(),sb=subj(curOf(s),sid),c=mxOf(s).cols.find(k=>k.id===cid);return `“${c?.name||''}” kaynağı ${sb?.name||''} dersinden kaldırılacak; bu dersteki test işaretleri ve doğru/yanlış sayıları silinir.`},
+  lesson:id=>{const l=S.lessons.find(q=>q.id===id);return l?`${stuName(l.sid,l.name)} ile ${fmt(l.date)} ${l.time} dersi programdan silinecek.`:'Ders silinecek.'},
+  fee:id=>{const f=S.fees.find(q=>q.id===id);return f?`${stuName(f.sid,f.name)} için ${money(f.amount)} tutarındaki ücret kaydı${(f.payments||[]).length?' ve alınan ödemeleri':''} silinecek.`:'Ücret kaydı silinecek.'},
   pastYear:y=>`${y} yılı için girilen tüm soru sayıları silinecek.`,
   examPdf:()=>'Bu denemeye eklenmiş PDF dosyaları kalıcı olarak silinecek.',
   exam:()=>'Deneme, tüm cevapları ve varsa PDF dosyası silinecek.'
@@ -1190,10 +1297,12 @@ const DEL={
   source:i=>{st().sources.splice(+i,1);return 'Kaynak silindi'},
   exam:id=>{dropAssets(S.exams.find(e=>e.id===id)?.pdf);S.exams=S.exams.filter(e=>e.id!==id);if(S.ui.examId===id)S.ui.examId=null;return 'Deneme silindi'},
   section:x=>{const [id,si]=x.split('|');const ex=S.exams.find(e=>e.id===id);ex.sections.splice(+si,1);S.ui.openSec=null;return 'Bölüm silindi'},
-  student:id=>{dropAssets(S.exams.filter(e=>e.sid===id).flatMap(e=>e.pdf||[]));S.students=S.students.filter(s=>s.id!==id);['tasks','questions','exams'].forEach(k=>S[k]=S[k].filter(x=>x.sid!==id));delete S.progress[id];delete S.plans[id];if(S.active===id)S.active=S.students[0]?.id||null;if(S.ui.editStudent===id)S.ui.editStudent=null;return 'Öğrenci ve kayıtları silindi'},
+  student:id=>{{const nm=S.students.find(s=>s.id===id)?.name;if(nm){S.lessons.forEach(l=>{if(l.sid===id)l.name=nm});S.fees.forEach(f=>{if(f.sid===id)f.name=nm})}}dropAssets(S.exams.filter(e=>e.sid===id).flatMap(e=>e.pdf||[]));S.students=S.students.filter(s=>s.id!==id);['tasks','questions','exams'].forEach(k=>S[k]=S[k].filter(x=>x.sid!==id));delete S.progress[id];delete S.plans[id];if(S.active===id)S.active=S.students[0]?.id||null;if(S.ui.editStudent===id)S.ui.editStudent=null;return 'Öğrenci ve kayıtları silindi'},
   cur:id=>{S.curricula=S.curricula.filter(c=>c.id!==id);S.ui.curId=null;return 'Müfredat silindi'},
   book:id=>{const b=S.books.find(x=>x.id===id);S.books=S.books.filter(x=>x.id!==id);dropAssets(b?.files);return 'Kitap silindi'},
   mxCol:x=>{const [sid,cid]=x.split('|'),s=st(),M=mxOf(s),sb=subj(curOf(s),sid);sb.topics.forEach(t=>{if(M.cells[t.id])delete M.cells[t.id][cid]});mxClean(M);return 'Kaynak dersten kaldırıldı'},
+  lesson:id=>{S.lessons=S.lessons.filter(q=>q.id!==id);return 'Ders silindi'},
+  fee:id=>{S.fees=S.fees.filter(q=>q.id!==id);return 'Ücret kaydı silindi'},
   pastYear:y=>{const P=pastOf(curOf(st()));P.years=P.years.filter(x=>x!==y);for(const t in P.counts)delete P.counts[t][y];return 'Yıl silindi'},
   examPdf:id=>{const ex=S.exams.find(e=>e.id===id);const f=ex.pdf;ex.pdf=[];dropAssets(f);return 'Sınav PDF\'i silindi'},
   orphan:id=>{ASL=(ASL||[]).filter(a=>a.id!==id);AS?.delete(id).catch(()=>{}).then(refreshAssets).then(()=>{if(S.ui.view==='kitaplar')render()});return 'PDF silindi'},
@@ -1206,6 +1315,8 @@ const C={
   taskDone:el=>{const t=S.tasks.find(x=>x.id===el.dataset.id);t.done=el.checked;commit()},
   subjPick:el=>{const cur=curOfSubj(el.value)||curOf(st());const t=document.getElementById(el.dataset.t);if(!t)return;t.innerHTML=optTopic(cur,el.value,'','— konu seç —',t.dataset.other==='1');if(t.dataset.x){const x=document.getElementById(t.dataset.x);if(x)x.hidden=true}srcRefresh(t.id)},
   activeCur:el=>{const s=st();if(!s||!(s.curIds||[]).includes(el.value))return;s.curId=el.value;S.ui.examId=null;S.ui.examMode=null;S.ui.editTask=null;MXINIT=false;commit(`${curOf(s).name} seçildi`)},
+  lessonDone:el=>{const l=S.lessons.find(q=>q.id===el.dataset.id);if(l){l.done=el.checked;commit()}},
+  feeFilter:el=>{S.ui[el.dataset.f]=el.value;render()},
   srcPick:el=>testsRefresh(el.dataset.p),
   topicPick:el=>{srcRefresh(el.id);const x=document.getElementById(el.dataset.x);if(!x)return;x.hidden=el.value!=='__other';if(!x.hidden)(x.matches('input')?x:x.querySelector('input'))?.focus()},
   bookName:el=>{const b=S.books.find(x=>x.id===el.dataset.id);if(!b)return;const nm=el.value.trim();if(!nm){el.value=b.name;return}S.students.forEach(s=>{const i=s.sources.indexOf(b.name);if(i>=0)s.sources[i]=nm});b.name=nm;save();toast('Kitap adı kaydedildi')},
