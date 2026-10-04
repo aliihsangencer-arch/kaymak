@@ -741,12 +741,11 @@ VIEWS.ogrenciler=()=>{
   const e=S.students.find(x=>x.id===S.ui.editStudent)||null;
   const f=e||{name:'',grade:'8',exam:'LGS',curId:S.curricula[0]?.id,curIds:S.curricula[0]?[S.curricula[0].id]:[],parent:'',parentEmail:'',parentPhone:'',startDate:iso(mondayOf(today())),examDate:DEF_EXAM()};
   return `${head('Öğrenciler',`<span class="pill mut">${S.students.length} öğrenci</span>`)}
-  <section class="card"><div class="card-h"><h2>${e?'Öğrenciyi düzenle':'Yeni öğrenci'}</h2><small>Sınıf ve sınav seçimi programı ve deneme bölümlerini belirler</small></div>
+  <section class="card"><div class="card-h"><h2>${e?'Öğrenciyi düzenle':'Yeni öğrenci'}</h2><small>İşaretlediğin sınavlar öğrencinin derslerini, konularını ve deneme bölümlerini belirler</small></div>
     <div class="row">
       <label class="f grow"><span>Ad soyad</span><input type="text" id="st-name" value="${esc(f.name)}"></label>
       <label class="f"><span>Sınıf</span><select id="st-grade" class="w-s">${opts(GRADES.map(g=>[g,/^\d/.test(g)?g+'. sınıf':g]),f.grade)}</select></label>
-      <label class="f"><span>Hazırlandığı sınav</span><select id="st-exam" class="w-m">${opts(EXAMS,f.exam)}</select></label>
-      <div class="f"><span>Hazırlandığı sınavlar / müfredatlar (birden fazla seçebilirsin)</span><div class="srcs" id="st-curs" style="min-height:36px;align-items:center">${S.curricula.map(c=>`<label class="tkt"><input type="checkbox" value="${c.id}" ${(f.curIds||[]).includes(c.id)?'checked':''}>${esc(c.name)}</label>`).join('')||'<small class="muted">Önce Müfredat sayfasından bir müfredat oluştur</small>'}</div></div>
+      <div class="f grow"><span>Hazırlandığı sınavlar (birden fazla işaretleyebilirsin)</span><div class="srcs" id="st-curs" style="min-height:36px;align-items:center">${S.curricula.map(c=>`<label class="tkt"><input type="checkbox" value="${c.id}" ${(f.curIds||[]).includes(c.id)?'checked':''}>${esc(c.name)}</label>`).join('')||'<small class="muted">Henüz müfredat yok</small>'}</div><small class="muted">Her sınavın kendi müfredatı olur. Listede olmayan bir sınav (örneğin TYT ya da AYT) için önce <button class="btn sm link" data-a="go" data-v="mufredat">Müfredat sayfasında</button> o sınavın müfredatını oluştur; sonra burada işaretle.</small></div>
       <label class="f"><span>Koçluğa başlama</span><input type="date" id="st-start" value="${esc(f.startDate)}"></label>
       <label class="f"><span>Sınav tarihi</span><input type="date" id="st-examd" value="${esc(f.examDate)}"></label>
     </div>
@@ -1094,7 +1093,7 @@ const A={
   saveStudent:()=>{const name=val('st-name').trim();if(!name){toast('Öğrencinin adını yaz');return}
     const curIds=[...document.querySelectorAll('#st-curs input:checked')].map(x=>x.value);if(!curIds.length){toast('En az bir müfredat seç');return}
     const prev=S.students.find(x=>x.id===S.ui.editStudent)?.curId;
-    const d={name,grade:val('st-grade'),exam:val('st-exam'),curIds,curId:curIds.includes(prev)?prev:curIds[0],parent:val('st-parent').trim(),parentEmail:val('st-mail').trim(),parentPhone:val('st-tel').trim(),startDate:val('st-start')||iso(mondayOf(today())),examDate:val('st-examd')||DEF_EXAM()};
+    const d={name,grade:val('st-grade'),exam:[...new Set(curIds.map(i=>curById(i)?.exam).filter(Boolean))].join(' + ')||'Diğer',curIds,curId:curIds.includes(prev)?prev:curIds[0],parent:val('st-parent').trim(),parentEmail:val('st-mail').trim(),parentPhone:val('st-tel').trim(),startDate:val('st-start')||iso(mondayOf(today())),examDate:val('st-examd')||DEF_EXAM()};
     const e=S.students.find(x=>x.id===S.ui.editStudent);if(e){Object.assign(e,d);delete e.sample;S.ui.editStudent=null;commit('Öğrenci güncellendi')}
     else{const n=Object.assign({id:uid(),sources:['MEB ders kitabı'],notes:[],reportNote:'',reviewWeeks:2},d);S.students.push(n);S.progress[n.id]={};S.plans[n.id]={weeks:{}};S.active=n.id;S.ui.view='plan';OPENW.clear();OPENP.clear();commit('Öğrenci eklendi · işlenen konuları işaretle, sonra planı yerleştir');window.scrollTo(0,0)}},
   editStudent:el=>{S.ui.editStudent=el.dataset.id;commit();window.scrollTo(0,0)},
