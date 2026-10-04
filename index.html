@@ -234,6 +234,8 @@ body.smode [data-a="del"],body.smode [data-a="mxMinus"],body.smode [data-a="mxCl
 body.smode .coach,body.smode [data-a="copyWeek"],body.smode [data-a="openPlan"]{display:none!important}
 @media (min-width:900px){body.split .pv{right:42%;border-right:1px solid var(--line)}body.split .ov{left:58%}}
 @media (max-width:899.98px){body.split .pv{bottom:50%;border-bottom:2px solid var(--muted)}body.split .ov{top:50%}}
+body.pmode .coach,body.pmode .noparent,body.pmode .mxpm,body.pmode .tbtns,body.pmode [data-a="del"],body.pmode [data-a="planToTask"],body.pmode [data-a="openPlan"],body.pmode .ph-r [data-a="go"],body.pmode .who,body.pmode [data-a="optik"]{display:none!important}
+body.pmode main input,body.pmode main select,body.pmode main textarea,body.pmode .mxb{pointer-events:none}
 .gate{position:fixed;inset:0;z-index:90;background:var(--bg);overflow-y:auto;display:grid;place-items:center;padding:24px 16px}
 .gate-c{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:26px;width:100%;max-width:400px;display:flex;flex-direction:column;gap:14px}
 .gate-c .f input{width:100%}
@@ -504,7 +506,7 @@ VIEWS.program=()=>{
   <section class="card"><div class="card-h"><h2>Bu haftanın plandaki konuları</h2><button class="btn sm" data-a="openPlan" data-k="${w.a}">Konu planında düzenle</button></div>
     ${pw.length?`<ul class="plist">${pw.map(it=>{const dn=itemDone(s,it);return `<li class="pitem ${dn?'done':''}"><input type="checkbox" data-c="planDone" data-id="${w.a}|${it.id}" ${dn?'checked':''} aria-label="İşlendi"><span class="chip">${esc(it.subj?subjName(cur,it.subj):'Genel')}</span><span class="pname">${esc(itemName(cur,it))}</span>${it.subj?`<button class="btn sm" data-a="planToTask" data-s="${it.subj}" data-t="${it.topic||''}" data-n="${esc(it.name||'')}">Göreve ekle</button>`:''}</li>`}).join('')}</ul>`:'<p class="empty">Bu hafta için planda konu yok. Konu planı sayfasından ekleyebilirsin.</p>'}
   </section>
-  <section class="card" id="task-form"><div class="card-h"><h2>${S.stuMode?'Fazladan yaptığın çalışmayı ekle':'Görev ekle'}</h2><div class="row" style="gap:10px;align-items:center;flex:1 1 220px;justify-content:flex-end"><small>${tasks.filter(t=>t.done&&!t.extra).length}/${tasks.filter(t=>!t.extra).length} görev tamamlandı${tasks.some(t=>t.extra)?` · +${tasks.filter(t=>t.extra).length} fazladan`:''}</small><div style="width:140px">${bar(pct(tasks.filter(t=>t.done&&!t.extra).length,tasks.filter(t=>!t.extra).length),'ok')}</div></div></div>
+  <section class="card noparent" id="task-form"><div class="card-h"><h2>${S.stuMode?'Fazladan yaptığın çalışmayı ekle':'Görev ekle'}</h2><div class="row" style="gap:10px;align-items:center;flex:1 1 220px;justify-content:flex-end"><small>${tasks.filter(t=>t.done&&!t.extra).length}/${tasks.filter(t=>!t.extra).length} görev tamamlandı${tasks.some(t=>t.extra)?` · +${tasks.filter(t=>t.extra).length} fazladan`:''}</small><div style="width:140px">${bar(pct(tasks.filter(t=>t.done&&!t.extra).length,tasks.filter(t=>!t.extra).length),'ok')}</div></div></div>
     <div class="row">
       <label class="f"><span>Gün</span><select id="tk-day" class="w-s">${DAYS.map((n,i)=>`<option value="${iso(addDays(w.mon,i))}" ${iso(addDays(w.mon,i))===tI?'selected':''}>${n}</option>`).join('')}</select></label>
       <label class="f"><span>Ders</span><select id="tk-subj" class="w-m" data-c="subjPick" data-t="tk-topic">${optSubj(cur,s0)}</select></label>
@@ -703,6 +705,7 @@ function vExamResult(ex){
 VIEWS.rapor=()=>{
   const s=st();if(!s)return noStudent();const txt=reportText(s);const w=weekRange(S.ui.week);
   return `${head('Veli raporu',weekNav())}
+  ${plCard(s)}
   <div class="grid2">
     <section class="card"><div class="card-h"><h2>Koç yorumu</h2><small>Rapora eklenir</small></div>
       <textarea id="rep-note" rows="5" data-c="repNote">${esc(s.reportNote||'')}</textarea>
@@ -883,7 +886,7 @@ VIEWS.matris=()=>{
     <div class="tile"><span class="k">Öğretmene sorulacak</span><span class="v">${all.w}</span><span class="s">yanlışı çözülmemiş test</span></div>
   </section>
   <section class="card"><div class="card-h"><h2>Nasıl kullanılır</h2></div>
-    <p class="muted">Bir dersi aç, kaynağın adını ve test sayısını yaz. “Konu” kutusunda tek bir konu seçersen yalnızca o konuya, “Tüm konular” kalırsa dersin bütün konularına eklenir. Bir konuda test sayısı farklıysa satırdaki − ve + ile ayarla. Öğrenci testi çözünce numaralı kutuya dokun; doğru ve yanlış sayısını gir.</p>
+    <p class="muted noparent">Bir dersi aç, kaynağın adını ve test sayısını yaz. “Konu” kutusunda tek bir konu seçersen yalnızca o konuya, “Tüm konular” kalırsa dersin bütün konularına eklenir. Bir konuda test sayısı farklıysa satırdaki − ve + ile ayarla. Öğrenci testi çözünce numaralı kutuya dokun; doğru ve yanlış sayısını gir.</p>
     <div class="legend" style="align-items:center"><span><span class="mxb" style="display:inline-flex;vertical-align:middle"><span>1</span><small>—</small></span> çözülmedi</span><span><span class="mxb ok" style="display:inline-flex;vertical-align:middle"><span>1 ✓</span><small>18·2</small></span> çözüldü (doğru·yanlış), yanlışlar birlikte çözüldü ya da yanlış yok</span><span><span class="mxb warn" style="display:inline-flex;vertical-align:middle"><span>1 !</span><small>15·5</small></span> yanlışlar öğretmene sorulacak</span></div>
   </section>
   ${cur.subjects.map(sb=>{const cols=M.cols.filter(c=>sb.topics.some(t=>M.cells[t.id]?.[c.id])),ss=mxStat(sb.topics.flatMap(t=>cols.flatMap(c=>M.cells[t.id]?.[c.id]||[])));
@@ -891,7 +894,7 @@ VIEWS.matris=()=>{
     ${cols.length?`<div class="tw" data-sb="${sb.id}"><table class="t mx"><thead><tr><th>Konu</th>${cols.map(c=>{const cs=mxStat(sb.topics.flatMap(t=>M.cells[t.id]?.[c.id]||[]));return `<th><div class="mxh"><b>${esc(c.name)}</b>${pdf(c.name)}${delBtn('mxCol',sb.id+'|'+c.id,'Kaldır')}</div><small class="num">${cs.dn}/${cs.n} test · ${cs.d}D ${cs.y}Y${cs.w?` · ${cs.w} sorulacak`:''}</small></th>`}).join('')}</tr></thead><tbody>
       ${sb.topics.map(t=>`<tr><td>${esc(t.name)}</td>${cols.map(c=>{const cell=M.cells[t.id]?.[c.id];return `<td><div class="mxc">${cell?cell.map((x,i)=>chip(x,i,t.id,c.id)).join(''):''}<span class="mxpm">${cell?`<button class="mxs" data-a="mxMinus" data-t="${t.id}" data-c2="${c.id}" aria-label="${esc(t.name)}: test sayısını azalt">−</button>`:''}<button class="mxs" data-a="mxPlus" data-t="${t.id}" data-c2="${c.id}" aria-label="${esc(t.name)}: test ekle">+</button></span></div></td>`}).join('')}</tr>`).join('')}
       </tbody></table></div>`:'<p class="empty">Bu derse henüz kaynak eklenmedi.</p>'}
-    <div class="row"><label class="f grow"><span>Kaynak</span><input type="text" id="mx-n-${sb.id}" list="mx-dl" placeholder="Kaynak adını yaz ya da listeden seç"></label><label class="f"><span>Konu</span><select id="mx-t-${sb.id}" class="w-l"><option value="">Tüm konular</option>${sb.topics.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select></label><label class="f"><span>Test sayısı</span><input type="number" id="mx-c-${sb.id}" min="1" max="20" value="3" inputmode="numeric"></label><button class="btn" data-a="mxAddCol" data-s="${sb.id}">Ekle</button></div>
+    <div class="row noparent"><label class="f grow"><span>Kaynak</span><input type="text" id="mx-n-${sb.id}" list="mx-dl" placeholder="Kaynak adını yaz ya da listeden seç"></label><label class="f"><span>Konu</span><select id="mx-t-${sb.id}" class="w-l"><option value="">Tüm konular</option>${sb.topics.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select></label><label class="f"><span>Test sayısı</span><input type="number" id="mx-c-${sb.id}" min="1" max="20" value="3" inputmode="numeric"></label><button class="btn" data-a="mxAddCol" data-s="${sb.id}">Ekle</button></div>
     </div></details>`}).join('')}`;
 };
 
@@ -990,12 +993,13 @@ VIEWS.yedek=()=>`${head('Yedek ve veriler')}
 const NAV=[['ozet','Özet'],['program','Haftalık program'],['plan','Konu planı'],['dagilim','Konu dağılımı'],['konular','Konu ve kaynak'],['matris','Kaynak takibi'],['kitaplar','PDF kitaplar'],['sorular','Soru takibi'],['denemeler','Denemeler'],['cikmis','Çıkmış sorular'],['rapor','Veli raporu'],['ogrenciler','Öğrenciler'],['mufredat','Müfredat'],['yedek','Yedek']];
 const STU_VIEWS=['program','dagilim','matris','denemeler','kitaplar'],STU_DENY=new Set(['resetExam','del','mxMinus','mxClear','pastRm','clearPlan','resetAll','restore']),STU_COACH=new Set(['optPause','openPlan','copyWeek','newExam','setKey','pasteKey','bulkTopic','addSec']);
 function render(){
+  document.body.classList.toggle('pmode',!!PARENT);if(PARENT&&!PARENT_NAV.some(([v])=>v===S.ui.view))S.ui.view='veli';
   document.body.classList.toggle('smode',!!S.stuMode);if(S.stuMode&&!STU_VIEWS.includes(S.ui.view))S.ui.view='matris';if(S.stuMode&&S.ui.examMode==='edit'){S.ui.examId=null;S.ui.examMode=null}
   const s=st();
-  document.getElementById('side').innerHTML=`<div class="side-top"><div class="brand"><span class="logo">k</span><b>k-Koçluk</b></div>
+  document.getElementById('side').innerHTML=`<div class="side-top"><div class="brand"><span class="logo">k</span><b>k-Koçluk</b></div>${PARENT?`<div><span class="pill mut">Veli görünümü</span>${s&&(s.curIds||[]).length>1?`<div style="margin-top:8px"><select id="active-cur" data-c="activeCur" aria-label="Sınav" style="width:100%">${s.curIds.map(i=>curById(i)).filter(Boolean).map(c=>`<option value="${c.id}" ${c.id===curOf(s).id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div>`:''}</div>`:''}
     <div class="who"><label for="active">Öğrenci</label><select id="active" data-c="active" style="width:100%" ${S.stuMode?'disabled':''}>${S.students.map(x=>`<option value="${x.id}" ${s&&x.id===s.id?'selected':''}>${esc(x.name)}</option>`).join('')||'<option>—</option>'}</select>${s&&(s.curIds||[]).length>1?`<label for="active-cur" style="margin-top:8px">Sınav</label><select id="active-cur" data-c="activeCur" style="width:100%">${s.curIds.map(i=>curById(i)).filter(Boolean).map(c=>`<option value="${c.id}" ${c.id===curOf(s).id?'selected':''}>${esc(c.name)}</option>`).join('')}</select>`:''}<div class="mode">${S.stuMode?'<span class="pill warn">Öğrenci modu</span><button class="btn sm link" data-a="coachMode">Koç girişi</button>':'<button class="btn sm link" data-a="stuMode">Öğrenci moduna geç</button><button class="btn sm link" data-a="signOut">Çıkış</button>'}</div></div></div>
-    <nav class="nav">${(S.stuMode?NAV.filter(([v])=>STU_VIEWS.includes(v)):ME?.role==='admin'?[...NAV,['yonetici','Yönetici']]:NAV).map(([v,l])=>`<button class="${S.ui.view===v?'on':''}" data-a="go" data-v="${v}">${l}</button>`).join('')}</nav>
-    <p class="side-foot"><span id="sync">${syncText()}</span><br>${esc(ME?.email||'')}</p>`;
+    <nav class="nav">${(PARENT?PARENT_NAV:S.stuMode?NAV.filter(([v])=>STU_VIEWS.includes(v)):ME?.role==='admin'?[...NAV,['yonetici','Yönetici']]:NAV).map(([v,l])=>`<button class="${S.ui.view===v?'on':''}" data-a="go" data-v="${v}">${l}</button>`).join('')}</nav>
+    <p class="side-foot">${PARENT?`Koç: ${esc(PARENT.coach)}<br>Yalnızca görüntüleme`:`<span id="sync">${syncText()}</span><br>${esc(ME?.email||'')}`}</p>`;
   if(S.ui.view==='yonetici'&&ME?.role!=='admin')S.ui.view='ozet';
   document.getElementById('main').innerHTML=(VIEW?`<div class="banner" role="status"><span><b>${esc(VIEW.name)}</b> adlı koçun kayıtlarını görüntülüyorsun. Burada yaptığın değişiklikler kaydedilmez.</span><button class="btn sm primary" data-a="viewExit">Kendi panelime dön</button></div>`:'')+(VIEWS[S.ui.view]||VIEWS.ozet)();
 }
@@ -1228,9 +1232,10 @@ const C={
   topicName:el=>{const [sid,tid]=el.dataset.id.split('|');const c=curById(S.ui.curId)||S.curricula[0];const t=subj(c,sid).topics.find(x=>x.id===tid);t.name=el.value;save();toast('Konu adı kaydedildi')}
 };
 document.addEventListener('click',e=>{if(e.target.id==='dlg'){closeAsk();return}const el=e.target.closest('[data-a]');if(!el)return;const a=el.dataset.a;
+  if(PARENT&&!(PARENT_OK.has(a)&&(a!=='go'||PARENT_NAV.some(([v])=>v===el.dataset.v))&&(a!=='openExam'||el.dataset.m==='result'))){e.preventDefault();return}
   if(S&&S.stuMode){if(STU_DENY.has(a)){e.preventDefault();toast('Silme yetkisi yalnızca koçta');return}if(a==='optik'&&S.exams.find(x=>x.id===el.dataset.id)?.done){e.preventDefault();toast('Bu deneme tamamlandı; yeniden açmayı yalnızca koç yapabilir');return}if(STU_COACH.has(a)||(a==='openExam'&&el.dataset.m==='edit')||(a==='go'&&!STU_VIEWS.includes(el.dataset.v))){e.preventDefault();toast('Bu sayfa yalnızca koça açık');return}}
   const f=A[a];if(f){e.preventDefault();f(el)}});
-document.addEventListener('change',e=>{const el=e.target.closest('[data-c]');if(!el)return;if(S&&S.stuMode&&el.dataset.c==='planDone'){el.checked=!el.checked;toast('Konuyu işlendi olarak yalnızca koç işaretler');return}const f=C[el.dataset.c];if(f)f(el)});
+document.addEventListener('change',e=>{const el=e.target.closest('[data-c]');if(!el)return;if(PARENT&&el.dataset.c!=='activeCur'){if(el.type==='checkbox')el.checked=!el.checked;return}if(S&&S.stuMode&&el.dataset.c==='planDone'){el.checked=!el.checked;toast('Konuyu işlendi olarak yalnızca koç işaretler');return}const f=C[el.dataset.c];if(f)f(el)});
 document.addEventListener('toggle',e=>{const d=e.target;if(!d.matches)return;if(d.matches('details.wk'))d.open?OPENW.add(d.dataset.k):OPENW.delete(d.dataset.k);else if(d.matches('details.pd'))d.open?OPENP.add(d.dataset.id):OPENP.delete(d.dataset.id)},true);
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!document.getElementById('dlg').hidden){closeAsk();return}if(e.key==='Escape'&&PV){pvClose();return}if(e.key==='Enter'&&e.target.closest('#gate')&&e.target.matches('input')){e.preventDefault();document.querySelector('#gate .btn.primary')?.click();return}if(e.key==='Enter'&&e.target.closest('#dlg')&&e.target.matches('input')){e.preventDefault();document.querySelector('#dlg .btn.primary')?.click();return}if(e.key==='Enter'&&e.target.matches('input[type=text]')){if(e.target.closest('#dlg')){return}const b=e.target.closest('.row')?.querySelector('.btn.primary,.btn[data-a^="add"],.btn[data-a="planAdd"],.btn[data-a="mxAddCol"]');if(b&&b.dataset.a&&(b.dataset.a.startsWith('add')||b.dataset.a==='planAdd'||b.dataset.a==='mxAddCol')){e.preventDefault();b.click()}}});
 /* ---------- bulut: hesap, onay, eşitleme ---------- */
@@ -1257,6 +1262,53 @@ async function cloudRefresh(){
     const {data:r}=await SB.from('coach_state').select('data,updated_at').eq('coach_id',AUTHU.id).maybeSingle();
     if(r&&r.updated_at&&r.updated_at!==CLOUD.at&&r.data&&r.data.v===1&&!CLOUD.dirty){const ui=S.ui;CLOUD.at=r.updated_at;init(r.data);S.ui=Object.assign(S.ui,{view:ui.view,week:ui.week});render();toast('Başka cihazdaki değişiklikler alındı')}}catch(e){}}
 
+/* veli bağlantısı */
+let PARENT=null;const PARENT_NAV=[['veli','Haftalık rapor'],['program','Haftalık program'],['denemeler','Denemeler'],['dagilim','Konu dağılımı'],['matris','Kaynak takibi']],PARENT_OK=new Set(['go','week','openExam','back','openPdf','pvClose','pvZoom','gateRetry']);
+const PL={map:null,busy:false,err:''};
+const plUrl=tok=>location.origin+location.pathname+'#veli='+tok;
+async function plLoad(){if(!SB||!AUTHU||VIEW)return;PL.busy=true;try{const r=await SB.from('parent_links').select('token,student_id').eq('coach_id',AUTHU.id);if(r.error)throw r.error;PL.map={};r.data.forEach(x=>PL.map[x.student_id]=x.token);PL.err=''}
+  catch(e){PL.map={};PL.err=/parent_links|schema|relation|404/i.test(e.message||'')?'Veli bağlantısı için 02 numaralı SQL dosyasını Supabase\'de çalıştırman gerekiyor.':aerr(e)}
+  PL.busy=false;if(S.ui.view==='rapor')render()}
+function plCard(s){if(VIEW||PARENT||!AUTHU)return '';
+  if(PL.map===null){if(!PL.busy)plLoad();return '<section class="card"><p class="empty">Veli bağlantısı yükleniyor…</p></section>'}
+  const tok=PL.map[s.id];
+  return `<section class="card"><div class="card-h"><h2>Veli bağlantısı</h2><small>${esc(s.name)} için</small></div>
+    ${PL.err?`<p class="note" role="alert">${esc(PL.err)}</p>`:tok?`<div class="row"><label class="f grow"><span>Bu bağlantıyı veliye gönder</span><input type="text" id="pl-url" readonly value="${esc(plUrl(tok))}"></label><button class="btn primary" data-a="plCopy">Kopyala</button><button class="btn" data-a="plRenew">Yenile</button><button class="btn link" data-a="plRevoke">İptal et</button></div>
+      <p class="note">Bağlantıyı açan kişi şifresiz olarak yalnızca ${esc(s.name)} için haftalık raporu, programı, deneme sonuçlarını ve konu/kaynak takibini görür; hiçbir şeyi değiştiremez. Koç notların ve diğer öğrenciler görünmez. “Yenile” eski bağlantıyı geçersiz kılıp yenisini üretir.</p>`
+      :`<div class="row" style="align-items:center"><button class="btn primary" data-a="plCreate">Veli bağlantısı oluştur</button><small>Veli şifresiz açar; istediğin zaman iptal edebilirsin.</small></div>`}
+  </section>`}
+async function plMake(s){const r=await SB.from('parent_links').insert({coach_id:AUTHU.id,student_id:s.id}).select('token').single();if(r.error)throw r.error;PL.map[s.id]=r.data.token}
+async function plDrop(s){const r=await SB.from('parent_links').delete().eq('coach_id',AUTHU.id).eq('student_id',s.id);if(r.error)throw r.error;delete PL.map[s.id]}
+async function parentEnter(tok){showGate('loading');let v=null;
+  try{const r=await SB.rpc('parent_view',{p_token:tok});if(r.error)throw r.error;v=r.data}catch(e){showGate('perror','',aerr(e));return}
+  if(!v||!v.ok||!v.data){showGate(v&&v.error==='inactive'?'pinactive':'pnotfound');return}
+  const keep=PARENT&&S?{view:S.ui.view,week:S.ui.week,cur:st()?.curId}:null;
+  AUTHU=null;ME=null;VIEW=null;PARENT={tok,coach:v.coach||'Koç'};init(v.data);S.stuMode=false;S.ui.view=keep?keep.view:'veli';S.ui.week=keep?keep.week:0;S.ui.examId=null;
+  if(keep&&keep.cur&&(st()?.curIds||[]).includes(keep.cur))st().curId=keep.cur;
+  showApp();render()}
+VIEWS.veli=()=>{
+  const s=st();if(!s)return `${head('Haftalık rapor')}<section class="card"><p class="empty">Kayıt bulunamadı.</p></section>`;
+  const cur=curOf(s),w=weekRange(S.ui.week);
+  const all=S.tasks.filter(t=>t.sid===s.id&&inR(t.date,w)),tasks=all.filter(t=>!t.extra),td=tasks.filter(t=>t.done).length,exn=all.length-tasks.length;
+  const qs=S.questions.filter(q=>q.sid===s.id&&inR(q.date,w)),qc=sum(qs,'count'),qd=sum(qs,'d');
+  const ex=doneExams(s,cur.id),sc=ex.map(e=>({e,r:scoreExam(e)})),upto=sc.filter(x=>x.e.date<=w.b),last=upto[upto.length-1],prev=upto[upto.length-2],diff=last&&prev?last.r.net-prev.r.net:null;
+  const tp=topicPct(s,cur),weak=weakTopics(s).sort((a,b)=>(b.y+b.b)/b.n-(a.y+a.b)/a.n||(b.y+b.b)-(a.y+a.b)).slice(0,5);
+  return `${head('Haftalık rapor',weekNav())}
+  <section class="tiles">
+    <div class="tile"><span class="k">Görevler</span><span class="v">${td}/${tasks.length}</span><span class="s">%${pct(td,tasks.length)} tamamlandı${exn?` · +${exn} fazladan`:''}</span></div>
+    <div class="tile"><span class="k">Çözülen soru</span><span class="v">${qc}</span><span class="s">%${pct(qd,qc)} doğru</span></div>
+    <div class="tile"><span class="k">Son deneme</span><span class="v">${last?n2(last.r.net):'—'}<small style="font-size:14px"> net</small></span><span class="s">${last?esc(last.e.name)+(diff!==null?` · <b class="${diff>=0?'up':'down'}">${diff>=0?'+':''}${n2(diff)}</b>`:''):'Henüz yok'}</span></div>
+    <div class="tile"><span class="k">Konu ilerlemesi</span><span class="v">%${pct(tp.d,tp.n)}</span><span class="s">${tp.d}/${tp.n} konu tamamlandı</span></div>
+  </section>
+  <div class="grid2">
+    <section class="card"><div class="card-h"><h2>Koçun yorumu</h2><small>${esc(PARENT?PARENT.coach:'')}</small></div>${s.reportNote?`<p style="white-space:pre-wrap">${esc(s.reportNote)}</p>`:'<p class="empty">Koç henüz bir yorum yazmadı.</p>'}</section>
+    <section class="card"><div class="card-h"><h2>Net gelişimi</h2><small>${esc(cur.name)}</small></div>${lineChart(sc.map(x=>({label:fmt(x.e.date),v:x.r.net})),'Deneme netleri')}</section>
+    <section class="card"><div class="card-h"><h2>Üzerinde çalışılan konular</h2><small>Denemelerde yanlış ve boş oranı yüksek olanlar</small></div>
+      ${weak.length?`<div class="tw"><table class="t"><thead><tr><th>Konu</th><th>Ders</th><th class="r">Yanlış+Boş / Soru</th></tr></thead><tbody>${weak.map(a=>`<tr><td>${esc(topicName(cur,a.tid))}</td><td><span class="chip">${esc(subjName(cur,a.subj))}</span></td><td class="r num">${a.y+a.b}/${a.n}</td></tr>`).join('')}</tbody></table></div>`:'<p class="empty">Deneme sonuçları geldikçe burada görünecek.</p>'}
+    </section>
+  </div>`;
+};
+
 /* giriş ekranları */
 const gateEl=document.getElementById('gate'),appEl=document.getElementById('app');
 const AERR={'Invalid login credentials':'E-posta ya da şifre yanlış.','Email not confirmed':'E-postanı henüz onaylamadın. Gelen kutundaki onay bağlantısına tıkla.','User already registered':'Bu e-postayla zaten bir hesap var. Giriş yapmayı dene.'};
@@ -1276,6 +1328,9 @@ function renderGate(){
     :m==='pending'?`<h2>Onay bekleniyor</h2>${who}<p>Hesabın oluşturuldu. Yönetici onayladığında uygulamayı kullanmaya başlayabilirsin.</p>${note}<div class="row">${again}${out}</div>`
     :m==='frozen'?`<h2>Hesabın donduruldu</h2>${who}<p>Kayıtların silinmedi, yerinde duruyor. Yeniden açılması için yöneticiyle iletişime geç.</p>${note}<div class="row">${again}${out}</div>`
     :m==='expired'?`<h2>Üyelik süren doldu</h2>${who}<p>Kayıtların silinmedi, yerinde duruyor. Üyeliğini yenilemek için yöneticiyle iletişime geç.</p>${note}<div class="row">${again}${out}</div>`
+    :m==='pnotfound'?`<h2>Bağlantı geçersiz</h2><p>Bu veli bağlantısı iptal edilmiş ya da hatalı. Koçunuzdan yeni bağlantı isteyin.</p>`
+    :m==='pinactive'?`<h2>Şu an görüntülenemiyor</h2><p>Bu bağlantı geçici olarak kapalı. Lütfen koçunuzla iletişime geçin.</p>`
+    :m==='perror'?`<h2>Bağlanılamadı</h2><p>Sunucuya ulaşılamadı. İnternet bağlantınızı kontrol edip yeniden deneyin.</p>${note}<div class="row">${again}</div>`
     :m==='noprofile'?`<h2>Hesap bulunamadı</h2>${who}<p>Bu hesap kullanıma kapatılmış ya da silinmiş. Yöneticiyle iletişime geç.</p>${note}<div class="row">${out}</div>`
     :`<h2>Bağlanılamadı</h2><p>Sunucuya ulaşılamadı. İnternet bağlantını kontrol edip yeniden dene.</p>${note}<div class="row">${again}</div>`;
   gateEl.innerHTML=`<div class="gate-c">${brand}${body}</div>`;const f=gateEl.querySelector('input');if(f)f.focus()}
@@ -1285,12 +1340,13 @@ async function enter(user){
   ME=p;const a=accessOf(p);if(a!=='ok'){showGate(a);return}
   let row=null;try{const r=await SB.from('coach_state').select('data,updated_at').eq('coach_id',user.id).maybeSingle();if(r.error)throw r.error;row=r.data}catch(e){showGate('error','',aerr(e));return}
   let local=null;try{if(localStorage.getItem(KEY+':pending:'+user.id)){const o=JSON.parse(localStorage.getItem(KEY+':'+user.id));if(o&&o.v===1)local=o}}catch(e){}
-  VIEW=null;MYS=null;ADM.rows=null;CLOUD.at=row&&row.updated_at;CLOUD.err='';CLOUD.dirty=false;
+  VIEW=null;MYS=null;ADM.rows=null;PL.map=null;PARENT=null;CLOUD.at=row&&row.updated_at;CLOUD.err='';CLOUD.dirty=false;
   if(local){init(local);cloudDirty()}else if(row&&row.data&&row.data.v===1)init(row.data);else{init(seed());showApp();render();save();return}
   showApp();render()}
 async function boot(){
   if(!window.supabase||!window.supabase.createClient){showGate('error','','Uygulamanın bir parçası yüklenemedi. Sayfayı yenile.');return}
   SB=window.supabase.createClient(SB_URL,SB_KEY);
+  if(PTOK){await parentEnter(PTOK);return}
   SB.auth.onAuthStateChange((ev)=>{if(ev==='PASSWORD_RECOVERY')setTimeout(()=>showGate('newpass'),0)});
   let sess=null;try{sess=(await SB.auth.getSession()).data.session}catch(e){}
   if(GATE.mode==='newpass')return;
@@ -1298,7 +1354,11 @@ async function boot(){
 
 Object.assign(A,{
   gateGo:el=>showGate(el.dataset.m),
-  gateRetry:async()=>{if(AUTHU)await enter(AUTHU);else await boot()},
+  gateRetry:async()=>{if(PTOK)await parentEnter(PTOK);else if(AUTHU)await enter(AUTHU);else await boot()},
+  plCreate:async()=>{const s=st();try{await plMake(s);commit('Veli bağlantısı oluşturuldu')}catch(e){toast(aerr(e))}},
+  plCopy:()=>copyFrom('pl-url','Bağlantı kopyalandı'),
+  plRenew:()=>{const s=st();ask('Emin misin?','Eski bağlantı hemen geçersiz olur; veliye yenisini göndermen gerekir.',async()=>{try{await plDrop(s);await plMake(s);commit('Yeni bağlantı oluşturuldu')}catch(e){toast(aerr(e));render()}})},
+  plRevoke:()=>{const s=st();ask('Emin misin?',`${s.name} için veli bağlantısı iptal edilecek; bağlantıyı açan kişi artık hiçbir şey göremez.`,async()=>{try{await plDrop(s);commit('Veli bağlantısı iptal edildi')}catch(e){toast(aerr(e))}})},
   gateLogin:async()=>{const email=val('g-mail').trim(),password=val('g-pass');if(!email||!password){showGate('login','','E-posta ve şifreni yaz.');return}showGate('loading');
     try{const {data,error}=await SB.auth.signInWithPassword({email,password});if(error)throw error;await enter(data.user)}catch(e){showGate('login','',aerr(e))}},
   gateSignup:async()=>{const full_name=val('g-name').trim(),email=val('g-mail').trim(),password=val('g-pass');if(!full_name||!email){showGate('signup','','Adını ve e-postanı yaz.');return}if(password.length<8){showGate('signup','','Şifre en az 8 karakter olmalı.');return}showGate('loading');
@@ -1318,7 +1378,7 @@ Object.assign(A,{
   admDel:el=>{const row=(ADM.rows||[]).find(r=>r.id===el.dataset.id);if(!row)return;ask('Emin misin?',`“${row.full_name||row.email}” adlı koç ve tüm kayıtları (öğrenciler, planlar, denemeler) kalıcı olarak silinecek. Bu işlem geri alınamaz.`,async()=>{
       try{const r=await SB.rpc('admin_delete_coach',{target:row.id});if(r.error)throw r.error;toast(String(r.data||'Silindi'));await admLoad(true)}catch(e){toast(aerr(e))}})}
 });
-STU_DENY.add('admDel');['admSet','admView','admLoad','signOut'].forEach(x=>STU_COACH.add(x));
+STU_DENY.add('admDel');STU_DENY.add('plRevoke');STU_DENY.add('plRenew');['admSet','admView','admLoad','signOut'].forEach(x=>STU_COACH.add(x));
 Object.assign(C,{
   admField:async el=>{const f=el.dataset.f;await admUpdate(el.dataset.id,{[f]:f==='paid_until'?(el.value||null):el.value},f==='paid_until'?'Üyelik tarihi kaydedildi':'Not kaydedildi')}
 });
@@ -1347,8 +1407,9 @@ VIEWS.yonetici=()=>{
       ${me?'<span class="muted">Bu senin hesabın</span>':`<button class="btn sm" data-a="admView" data-id="${r.id}">Kayıtlarını gör</button>`}
       ${adm?'':`<button class="btn sm link" data-a="admDel" data-id="${r.id}">Kalıcı sil</button>`}</div></article>`}).join('')}</section>`;
 };
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){if(CLOUD.dirty)cloudSave()}else cloudRefresh()});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){if(CLOUD.dirty)cloudSave()}else if(PARENT){if(document.getElementById('gate').hidden&&!PV)parentEnter(PARENT.tok)}else cloudRefresh()});
 window.addEventListener('pagehide',()=>{if(CLOUD.dirty)cloudSave()});
+const PTOK=(location.hash.match(/veli=([a-f0-9]{32,})/)||[])[1]||'';
 ASREADY=true;
 boot();
 
