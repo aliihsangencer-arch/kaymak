@@ -61,3 +61,17 @@ create policy coach_payments_select on public.coach_payments for select to authe
 drop policy if exists coach_payments_write on public.coach_payments;
 create policy coach_payments_write on public.coach_payments for all to authenticated
   using (public.is_admin()) with check (public.is_admin());
+
+-- 5) Yönetici, bir koçun öğrencilerine yazdığı saatlik ve aylık ücretleri değiştirebilir.
+--    Koçun diğer kayıtlarına dokunmaz; yalnızca ücret alanlarını günceller.
+create or replace function public.admin_set_fees(target uuid, rates jsonb, monthly jsonb) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_admin() then raise exception 'Bu işlemi yalnızca yönetici yapabilir'; end if;
+  update public.coach_state
+     set data = jsonb_set(jsonb_set(data, '{rates}', coalesce(rates, '{}'::jsonb), true),
+                          '{monthly}', coalesce(monthly, '{}'::jsonb), true)
+   where coach_id = target;
+end $$;
+revoke execute on function public.admin_set_fees(uuid, jsonb, jsonb) from public, anon;
+grant  execute on function public.admin_set_fees(uuid, jsonb, jsonb) to authenticated;

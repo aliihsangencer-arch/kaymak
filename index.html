@@ -342,7 +342,7 @@ function seed(){
 /* ---------- durum ---------- */
 function load(){try{const r=localStorage.getItem(KEY);if(r){const o=JSON.parse(r);if(o&&o.v===1)return o}}catch(e){}return seed()}
 function DEF_EXAM(){const t=today();const y=t.getMonth()>=6?t.getFullYear()+1:t.getFullYear();return `${y}-06-06`}
-function migrate(o){o.lessons=Array.isArray(o.lessons)?o.lessons:[];o.fees=Array.isArray(o.fees)?o.fees:[];o.pays=Array.isArray(o.pays)?o.pays:[];o.rates=o.rates||{};o.fees.forEach(f=>{(f.payments||[]).forEach(q=>o.pays.push({id:uid(),sid:f.sid,name:f.name,amount:+q.amount||0,date:q.date,note:f.note||''}));delete f.payments});o.lessons.forEach(l=>{if(l.done&&l.fee==null)l.fee=Math.round((+o.rates[l.sid]||0)*l.min/60*100)/100});o.plans=o.plans||{};o.books=Array.isArray(o.books)?o.books:[];o.progress=o.progress||{};(o.students||[]).forEach(s=>{if(!s.startDate)s.startDate=iso(mondayOf(today()));if(!s.examDate)s.examDate=DEF_EXAM();if(s.reviewWeeks==null)s.reviewWeeks=2;if(!Array.isArray(s.curIds))s.curIds=s.curId?[s.curId]:[];if(s.curId&&!s.curIds.includes(s.curId))s.curIds.unshift(s.curId);if(s.planBuilt&&s.planEdited==null)s.planEdited=true});return o}
+function migrate(o){o.lessons=Array.isArray(o.lessons)?o.lessons:[];o.fees=Array.isArray(o.fees)?o.fees:[];o.pays=Array.isArray(o.pays)?o.pays:[];o.rates=o.rates||{};o.monthly=o.monthly||{};o.fees.forEach(f=>{(f.payments||[]).forEach(q=>o.pays.push({id:uid(),sid:f.sid,name:f.name,amount:+q.amount||0,date:q.date,note:f.note||''}));delete f.payments});o.lessons.forEach(l=>{if(l.done&&l.fee==null)l.fee=Math.round((+o.rates[l.sid]||0)*l.min/60*100)/100});o.plans=o.plans||{};o.books=Array.isArray(o.books)?o.books:[];o.progress=o.progress||{};(o.students||[]).forEach(s=>{if(!s.startDate)s.startDate=iso(mondayOf(today()));if(!s.examDate)s.examDate=DEF_EXAM();if(s.reviewWeeks==null)s.reviewWeeks=2;if(!Array.isArray(s.curIds))s.curIds=s.curId?[s.curId]:[];if(s.curId&&!s.curIds.includes(s.curId))s.curIds.unshift(s.curId);if(s.planBuilt&&s.planEdited==null)s.planEdited=true});return o}
 function init(o){S=migrate(o);S.ui=Object.assign({view:'ozet',week:0,examId:null,examMode:null,curId:null,editStudent:null,editTask:null,openSec:0},S.ui||{});
   S.students.forEach(s=>{if(!s.autoPlan)return;delete s.autoPlan;
     const cur=curOf(s),W=plan(s.id).weeks,past=planWeeks(s).filter(k=>k<curMon());
@@ -753,6 +753,7 @@ VIEWS.ogrenciler=()=>{
       <label class="f"><span>Koçluğa başlama</span><input type="date" id="st-start" value="${esc(f.startDate)}"></label>
       <label class="f"><span>Sınav tarihi</span><input type="date" id="st-examd" value="${esc(f.examDate)}"></label>
       <label class="f"><span>Saatlik ders ücreti (TL)</span><input type="number" id="st-rate" min="0" step="50" inputmode="decimal" style="width:120px" value="${e&&S.rates[e.id]?S.rates[e.id]:''}"></label>
+      <label class="f"><span>Aylık ücret (TL)</span><input type="number" id="st-mon" min="0" step="100" inputmode="decimal" style="width:120px" value="${e&&monNow(e.id)?monNow(e.id):''}"></label>
     </div>
     ${e?'':'<p class="note">Sürece daha önce başladıysan başlama tarihini geriye al. Öğrenciyi ekledikten sonra Konu planı sayfası açılır; orada geçmiş haftalarda işlediğin konuları işaretler, kalan konuları haftalara kendin yerleştirirsin.</p>'}
     <div class="row">
@@ -911,17 +912,23 @@ const endTime=(t,min)=>{const [h,m]=String(t||'0:0').split(':').map(Number),x=(h
 const hoursTxt=min=>{const h=Math.floor(min/60),m=min%60;return h?(m?`${h} sa ${m} dk`:`${h} sa`):`${m} dk`};
 const stuOpts=sel=>S.students.map(x=>`<option value="${x.id}" ${x.id===sel?'selected':''}>${esc(x.name)}</option>`).join('');
 const r2=v=>Math.round((+v||0)*100)/100;
+const ymNow=()=>iso(today()).slice(0,7),ymNext=m=>{const [y,k]=m.split('-').map(Number);return k===12?(y+1)+'-01':y+'-'+pad(k+1)};
+const monOf=(sid,m)=>{let a=0;(S.monthly[sid]||[]).forEach(x=>{if(x.from<=m)a=+x.amount||0});return a},monNow=sid=>monOf(sid,ymNow());
+function setMonthly(sid,amount){const m=ymNow(),L=(S.monthly[sid]||[]).filter(x=>x.from<m);if(amount>0||L.length)L.push({from:m,amount});S.monthly[sid]=L}
+function monthRows(sid){const E=[],now=ymNow();Object.keys(S.monthly).forEach(id=>{if(sid&&id!==sid)return;const L=S.monthly[id]||[];if(!L.length)return;const nm=S.students.find(x=>x.id===id)?.name||L.name||'';for(let m=L[0].from,i=0;m<=now&&i<240;m=ymNext(m),i++){const a=monOf(id,m);if(a>0)E.push({k:'month',id:id+m,sid:id,name:nm,date:m+'-01',desc:'Aylık ücret · '+m,debit:a,credit:0})}});return E}
+async function feeSync(msg){if(!VIEW){commit(msg);return}try{const r=await SB.rpc('admin_set_fees',{target:VIEW.id,rates:S.rates,monthly:S.monthly});if(r.error)throw r.error;render();toast(msg+' · koçun kaydına işlendi')}catch(e){render();toast(billErr(e))}}
 const rateOf=sid=>+S.rates[sid]||0,lessonFee=l=>r2(rateOf(l.sid)*l.min/60);
 function ledger(sid){const E=[];
   S.lessons.forEach(l=>{if(l.done&&(!sid||l.sid===sid))E.push({k:'lesson',id:l.id,sid:l.sid,name:l.name,date:l.date,desc:`Ders · ${l.time} · ${l.min} dk${l.note?' · '+l.note:''}`,debit:+l.fee||0,credit:0})});
   S.fees.forEach(f=>{if(!sid||f.sid===sid)E.push({k:'fee',id:f.id,sid:f.sid,name:f.name,date:f.due,desc:f.note||'Ek alacak',debit:+f.amount||0,credit:0})});
   S.pays.forEach(q=>{if(!sid||q.sid===sid)E.push({k:'pay',id:q.id,sid:q.sid,name:q.name,date:q.date,desc:q.note||'Ödeme alındı',debit:0,credit:+q.amount||0})});
+  monthRows(sid).forEach(e=>E.push(e));
   return E.sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:(a.credit-b.credit))}
-function balances(){const per={};const g=(sid,name)=>per[sid]||(per[sid]={sid,name,n:0,min:0,les:0,extra:0,paid:0});
+function balances(){const per={};const g=(sid,name)=>per[sid]||(per[sid]={sid,name,n:0,min:0,les:0,mon:0,extra:0,paid:0});
   S.students.forEach(x=>g(x.id,x.name));
   S.lessons.forEach(l=>{if(l.done){const x=g(l.sid,l.name);x.n++;x.min+=+l.min||0;x.les+=+l.fee||0}});
-  S.fees.forEach(f=>{g(f.sid,f.name).extra+=+f.amount||0});S.pays.forEach(q=>{g(q.sid,q.name).paid+=+q.amount||0});
-  return Object.values(per).map(x=>Object.assign(x,{bal:r2(x.les+x.extra-x.paid)}))}
+  monthRows().forEach(e=>{g(e.sid,e.name).mon+=e.debit});S.fees.forEach(f=>{g(f.sid,f.name).extra+=+f.amount||0});S.pays.forEach(q=>{g(q.sid,q.name).paid+=+q.amount||0});
+  return Object.values(per).map(x=>Object.assign(x,{bal:r2(x.les+x.mon+x.extra-x.paid)}))}
 const balPill=b=>b>0.004?`<span class="pill warn">Alacak ${money(b)}</span>`:b<-0.004?`<span class="pill bad">Verecek ${money(-b)}</span>`:'<span class="pill ok">Kapalı</span>';
 VIEWS.dersler=()=>{
   const w=weekRange(S.ui.week),tI=iso(today()),ls=S.lessons.filter(l=>inR(l.date,w)).sort((a,b)=>(a.date+a.time<b.date+b.time?-1:1));
@@ -959,7 +966,7 @@ VIEWS.ucretler=()=>{
   const mL=S.lessons.filter(l=>l.done&&l.date.slice(0,7)===ym),mP=S.pays.filter(q=>String(q.date).slice(0,7)===ym);
   const al=B.filter(x=>x.bal>0),ve=B.filter(x=>x.bal<0);let run=0;
   const rows=L.map(e=>{run=r2(run+e.debit-e.credit);return Object.assign({run},e)}).reverse();
-  const act=B.filter(x=>x.n||x.extra||x.paid||S.students.some(q=>q.id===x.sid));
+  const act=B.filter(x=>x.n||x.mon||x.extra||x.paid||S.students.some(q=>q.id===x.sid));
   return `${coachHead('Alacak / verecek')}
   <section class="tiles">
     <div class="tile"><span class="k">Bu ay ders alacağı</span><span class="v" style="font-size:22px">${money(sum(mL,'fee'))}</span><span class="s">${mL.length} ders · ${hoursTxt(sum(mL,'min'))}</span></div>
@@ -983,14 +990,14 @@ VIEWS.ucretler=()=>{
       <label class="f grow"><span>Açıklama</span><input type="text" id="fe-note" placeholder="Örn. Deneme paketi"></label>
       <button class="btn" data-a="addFee">Ekle</button>
     </div></section>`:'<section class="card"><p class="empty">Önce Öğrenciler sayfasından öğrenci ekle.</p></section>'}
-  <section class="card"><div class="card-h"><h2>Öğrenci bazında</h2><small>Saatlik ücreti buradan da değiştirebilirsin; değişiklik sonraki derslere uygulanır</small></div>
-    ${act.length?`<div class="tw"><table class="t"><thead><tr><th>Öğrenci</th><th>Saatlik ücret</th><th class="r">Yapılan ders</th><th class="r">Ders alacağı</th><th class="r">Ek alacak</th><th class="r">Alınan</th><th>Durum</th></tr></thead><tbody>
-    ${act.sort((a,b)=>b.bal-a.bal).map(x=>{const live=S.students.some(q=>q.id===x.sid);return `<tr><td>${esc(stuName(x.sid,x.name))}</td><td>${live?`<input type="number" data-c="rateSet" data-id="${x.sid}" min="0" step="50" inputmode="decimal" style="width:100px" value="${rateOf(x.sid)||''}" placeholder="TL/saat" aria-label="Saatlik ücret">`:'—'}</td><td class="r num">${x.n} · ${hoursTxt(x.min)}</td><td class="r num">${money(x.les)}</td><td class="r num">${money(x.extra)}</td><td class="r num">${money(x.paid)}</td><td>${balPill(x.bal)}</td></tr>`}).join('')}
-    </tbody><tfoot><tr><td>Toplam</td><td></td><td class="r num">${sum(act,'n')}</td><td class="r num">${money(sum(act,'les'))}</td><td class="r num">${money(sum(act,'extra'))}</td><td class="r num">${money(sum(act,'paid'))}</td><td>${balPill(r2(sum(act,'bal')))}</td></tr></tfoot></table></div>`:'<p class="empty">Henüz kayıt yok.</p>'}
+  <section class="card"><div class="card-h"><h2>Öğrenci bazında</h2><small>Saatlik ücret sonraki derslere, aylık ücret bu aydan itibaren uygulanır; ikisi birlikte de kullanılabilir</small></div>
+    ${act.length?`<div class="tw"><table class="t"><thead><tr><th>Öğrenci</th><th>Saatlik ücret</th><th>Aylık ücret</th><th class="r">Yapılan ders</th><th class="r">Ders alacağı</th><th class="r">Aylık alacak</th><th class="r">Ek alacak</th><th class="r">Alınan</th><th>Durum</th></tr></thead><tbody>
+    ${act.sort((a,b)=>b.bal-a.bal).map(x=>{const live=S.students.some(q=>q.id===x.sid);return `<tr><td>${esc(stuName(x.sid,x.name))}</td><td>${live?`<input type="number" data-c="rateSet" data-id="${x.sid}" min="0" step="50" inputmode="decimal" style="width:100px" value="${rateOf(x.sid)||''}" placeholder="TL/saat" aria-label="Saatlik ücret">`:'—'}</td><td>${live?`<input type="number" data-c="monSet" data-id="${x.sid}" min="0" step="100" inputmode="decimal" style="width:100px" value="${monNow(x.sid)||''}" placeholder="TL/ay" aria-label="Aylık ücret">`:'—'}</td><td class="r num">${x.n} · ${hoursTxt(x.min)}</td><td class="r num">${money(x.les)}</td><td class="r num">${money(x.mon)}</td><td class="r num">${money(x.extra)}</td><td class="r num">${money(x.paid)}</td><td>${balPill(x.bal)}</td></tr>`}).join('')}
+    </tbody><tfoot><tr><td>Toplam</td><td></td><td></td><td class="r num">${sum(act,'n')}</td><td class="r num">${money(sum(act,'les'))}</td><td class="r num">${money(sum(act,'mon'))}</td><td class="r num">${money(sum(act,'extra'))}</td><td class="r num">${money(sum(act,'paid'))}</td><td>${balPill(r2(sum(act,'bal')))}</td></tr></tfoot></table></div>`:'<p class="empty">Henüz kayıt yok.</p>'}
   </section>
   <section class="card"><div class="card-h"><h2>Hareketler</h2><select data-c="feeFilter" data-f="feeS" aria-label="Öğrenci"><option value="">Tüm öğrenciler</option>${stuOpts(fs)}</select></div>
     ${rows.length?`<div class="tw"><table class="t"><thead><tr><th>Tarih</th><th>Öğrenci</th><th>Açıklama</th><th class="r">Alacak</th><th class="r">Alınan</th><th class="r">${fs?'Bakiye':'Genel bakiye'}</th><th></th></tr></thead><tbody>
-    ${rows.slice(0,300).map(e=>`<tr><td class="num" style="white-space:nowrap">${parse(e.date).toLocaleDateString('tr-TR',{day:'numeric',month:'short',year:'numeric'})}</td><td>${esc(stuName(e.sid,e.name))}</td><td>${esc(e.desc)}</td><td class="r num">${e.debit?money(e.debit):''}</td><td class="r num">${e.credit?money(e.credit):''}</td><td class="r num"><b>${money(e.run)}</b></td><td>${e.k==='lesson'?'':delBtn(e.k,e.id)}</td></tr>`).join('')}
+    ${rows.slice(0,300).map(e=>`<tr><td class="num" style="white-space:nowrap">${parse(e.date).toLocaleDateString('tr-TR',{day:'numeric',month:'short',year:'numeric'})}</td><td>${esc(stuName(e.sid,e.name))}</td><td>${esc(e.desc)}</td><td class="r num">${e.debit?money(e.debit):''}</td><td class="r num">${e.credit?money(e.credit):''}</td><td class="r num"><b>${money(e.run)}</b></td><td>${e.k==='lesson'||e.k==='month'?'':delBtn(e.k,e.id)}</td></tr>`).join('')}
     </tbody></table></div><small class="muted">Bakiye artı ise öğrenciden alacağın, eksi ise peşin aldığın (dersini henüz yapmadığın) tutardır. Ders satırları Ders programım sayfasından yönetilir.</small>`:'<p class="empty">Henüz hareket yok. Ders programında bir dersi “Yapıldı” işaretlediğinde burada görünür.</p>'}
   </section>
   ${myBillCard()}`;
@@ -1120,7 +1127,7 @@ function render(){
     <nav class="nav">${(PARENT?PARENT_NAV:S.stuMode?NAV.filter(([v])=>STU_VIEWS.includes(v)):ME?.role==='admin'?[...NAV,['yonetici','Yönetici']]:NAV).map(([v,l])=>`<button class="${S.ui.view===v?'on':''}" data-a="go" data-v="${v}">${l}</button>`).join('')}</nav>
     <p class="side-foot">${STUDENT?`<span id="sync">${stuSyncText()}</span><br>Koç: ${esc(STUDENT.coach)}`:PARENT?`Koç: ${esc(PARENT.coach)}<br>Yalnızca görüntüleme`:`<span id="sync">${syncText()}</span><br>${esc(ME?.email||'')}`}</p>`;
   if(S.ui.view==='yonetici'&&ME?.role!=='admin')S.ui.view='ozet';
-  document.getElementById('main').innerHTML=(VIEW?`<div class="banner" role="status"><span><b>${esc(VIEW.name)}</b> adlı koçun kayıtlarını görüntülüyorsun. Burada yaptığın değişiklikler kaydedilmez.</span><button class="btn sm primary" data-a="viewExit">Kendi panelime dön</button></div>`:'')+(VIEWS[S.ui.view]||VIEWS.ozet)();
+  document.getElementById('main').innerHTML=(VIEW?`<div class="banner" role="status"><span><b>${esc(VIEW.name)}</b> adlı koçun kayıtlarını görüntülüyorsun. Burada yaptığın değişiklikler kaydedilmez; yalnızca “Alacak / verecek” sayfasındaki saatlik ve aylık ücretleri değiştirebilirsin.</span><button class="btn sm primary" data-a="viewExit">Kendi panelime dön</button></div>`:'')+(VIEWS[S.ui.view]||VIEWS.ozet)();
 }
 function commit(msg){save();render();if(msg)toast(msg)}
 const val=id=>document.getElementById(id)?.value??'';
@@ -1213,8 +1220,8 @@ const A={
     const curIds=[...document.querySelectorAll('#st-curs input:checked')].map(x=>x.value);if(!curIds.length){toast('En az bir müfredat seç');return}
     const prev=S.students.find(x=>x.id===S.ui.editStudent)?.curId;
     const d={name,grade:val('st-grade'),exam:[...new Set(curIds.map(i=>curById(i)?.exam).filter(Boolean))].join(' + ')||'Diğer',curIds,curId:curIds.includes(prev)?prev:curIds[0],parent:val('st-parent').trim(),parentEmail:val('st-mail').trim(),parentPhone:val('st-tel').trim(),startDate:val('st-start')||iso(mondayOf(today())),examDate:val('st-examd')||DEF_EXAM()};
-    const rate=r2(val('st-rate'));const e=S.students.find(x=>x.id===S.ui.editStudent);if(e){S.rates[e.id]=rate;Object.assign(e,d);delete e.sample;S.ui.editStudent=null;commit('Öğrenci güncellendi')}
-    else{const n=Object.assign({id:uid(),sources:['MEB ders kitabı'],notes:[],reportNote:'',reviewWeeks:2},d);S.students.push(n);S.rates[n.id]=rate;S.progress[n.id]={};S.plans[n.id]={weeks:{}};S.active=n.id;S.ui.view='plan';OPENW.clear();OPENP.clear();commit('Öğrenci eklendi · işlenen konuları işaretle, sonra planı yerleştir');window.scrollTo(0,0)}},
+    const rate=r2(val('st-rate'));const e=S.students.find(x=>x.id===S.ui.editStudent);const mon=r2(val('st-mon'));if(e){S.rates[e.id]=rate;if(mon!==monNow(e.id))setMonthly(e.id,mon);Object.assign(e,d);delete e.sample;S.ui.editStudent=null;commit('Öğrenci güncellendi')}
+    else{const n=Object.assign({id:uid(),sources:['MEB ders kitabı'],notes:[],reportNote:'',reviewWeeks:2},d);S.students.push(n);S.rates[n.id]=rate;setMonthly(n.id,mon);S.progress[n.id]={};S.plans[n.id]={weeks:{}};S.active=n.id;S.ui.view='plan';OPENW.clear();OPENP.clear();commit('Öğrenci eklendi · işlenen konuları işaretle, sonra planı yerleştir');window.scrollTo(0,0)}},
   editStudent:el=>{S.ui.editStudent=el.dataset.id;commit();window.scrollTo(0,0)},
   cancelStudent:()=>{S.ui.editStudent=null;commit()},
   pickCur:el=>{S.ui.curId=el.dataset.id;S.ui.openSec=null;commit()},
@@ -1354,7 +1361,8 @@ const C={
   subjPick:el=>{const cur=curOfSubj(el.value)||curOf(st());const t=document.getElementById(el.dataset.t);if(!t)return;t.innerHTML=optTopic(cur,el.value,'','— konu seç —',t.dataset.other==='1');if(t.dataset.x){const x=document.getElementById(t.dataset.x);if(x)x.hidden=true}srcRefresh(t.id)},
   activeCur:el=>{const s=st();if(!s||!(s.curIds||[]).includes(el.value))return;s.curId=el.value;S.ui.examId=null;S.ui.examMode=null;S.ui.editTask=null;MXINIT=false;commit(`${curOf(s).name} seçildi`)},
   lessonDone:el=>{const l=S.lessons.find(q=>q.id===el.dataset.id);if(!l)return;l.done=el.checked;if(l.done){l.fee=lessonFee(l);commit(l.fee?`${money(l.fee)} alacağa yazıldı`:'Ders yapıldı · saatlik ücret girilmediği için alacak yazılmadı')}else{delete l.fee;commit('Ders alacaktan çıkarıldı')}},
-  rateSet:el=>{S.rates[el.dataset.id]=r2(el.value);commit('Saatlik ücret kaydedildi')},
+  rateSet:el=>{S.rates[el.dataset.id]=r2(el.value);feeSync('Saatlik ücret kaydedildi')},
+  monSet:el=>{setMonthly(el.dataset.id,r2(el.value));feeSync('Aylık ücret kaydedildi')},
   feeFilter:el=>{S.ui[el.dataset.f]=el.value;render()},
   srcPick:el=>testsRefresh(el.dataset.p),
   topicPick:el=>{srcRefresh(el.id);const x=document.getElementById(el.dataset.x);if(!x)return;x.hidden=el.value!=='__other';if(!x.hidden)(x.matches('input')?x:x.querySelector('input'))?.focus()},
