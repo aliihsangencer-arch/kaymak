@@ -899,7 +899,7 @@ VIEWS.matris=()=>{
 };
 
 /* ---------- PDF kitaplar ---------- */
-let AS=null,ASREADY=false,ASU=null,ASL=null,LIM=20*1048576;const BK={busy:false,msg:''};
+let AS=null,ASREADY=false,ASU=null,ASL=null,LIM=45*1048576;const BK={busy:false,msg:''};
 const mb=b=>(b/1048576).toLocaleString('tr-TR',{maximumFractionDigits:1})+' MB';
 let PERM=null,ASP='';
 async function asRetry(){try{AS=(await window.claude.use('assets'))||null}catch(e){AS=null}if(AS){await refreshAssets();commit('Dosya saklama açıldı')}else{save();location.reload()}}
@@ -907,12 +907,20 @@ function asNote(){const b=(a,t)=>` <button class="btn sm primary" data-a="${a}">
   const m=ASP==='prompt'?'PDF yüklemek için panelin dosya saklama iznine ihtiyacı var.'+b('asGrant','İzin ver')
     :ASP==='denied'?'Dosya saklama izni kapalı.'+b('asManage','İzinleri aç')
     :ASP==='granted'?'İzin verilmiş ama yükleme alanı açılamadı.'+b('asReload','Sayfayı yenile')
-    :'PDF dosyası yükleme bir sonraki aşamada sunucu deposuna taşınacak. Şimdilik kitapları ve sınavları “Bağlantıyla ekle” ile ekleyebilirsin.';
+    :'PDF dosyalarını yalnızca koç kendi hesabıyla yükleyebilir.';
   return `<p class="note">${m} Yüklü PDF'ler yine de açılır.</p>`}
-const BKERR={too_large:'dosya 20 MB sınırını aşıyor ve bölünemedi',unsupported_type:'geçerli bir PDF değil',quota_or_state:'saklama alanı doldu ya da panel şu an dosya kabul etmiyor',rate_limited:'çok sık yükleme yapıldı, biraz sonra tekrar dene',not_granted:'bu görünümde dosya yükleme izni yok',capability_disabled:'bu görünümde dosya yükleme kullanılamıyor',capability_removed:'bu görünümde dosya yükleme kullanılamıyor',upstream_auth:'oturum doğrulanamadı; sayfayı yenileyip tekrar dene',split:'PDF bölünemedi (şifreli ya da bozuk olabilir)'};
+const BKERR={no_bucket:'PDF deposu henüz kurulmamış; 04 numaralı SQL dosyasını Supabase\'de çalıştır',too_large:'dosya 50 MB sınırını aşıyor ve bölünemedi',unsupported_type:'geçerli bir PDF değil',quota_or_state:'saklama alanı doldu ya da panel şu an dosya kabul etmiyor',rate_limited:'çok sık yükleme yapıldı, biraz sonra tekrar dene',not_granted:'bu görünümde dosya yükleme izni yok',capability_disabled:'bu görünümde dosya yükleme kullanılamıyor',capability_removed:'bu görünümde dosya yükleme kullanılamıyor',upstream_auth:'oturum doğrulanamadı; sayfayı yenileyip tekrar dene',split:'PDF bölünemedi (şifreli ya da bozuk olabilir)'};
 async function refreshAssets(){if(!AS)return;try{const r=await AS.list();ASU=r.usage;ASL=r.assets}catch(e){}}
 function bkMsg(m){BK.msg=m;const e=document.getElementById('bk-status');if(e){e.textContent=m;e.hidden=!m}}
 async function up(blob){try{return await AS.upload(blob,{type:'application/pdf'})}catch(e){if(e&&e.code==='store_unavailable'){await new Promise(r=>setTimeout(r,1500));return AS.upload(blob,{type:'application/pdf'})}throw e}}
+/* PDF deposu: dosyalar koçun kendi klasörüne yüklenir; adresi bilen (öğrenci, veli) açabilir */
+const pdfUrl=aid=>String(aid).includes('/')?SB_URL+'/storage/v1/object/public/pdf/'+String(aid).split('/').map(encodeURIComponent).join('/'):'/_blob/'+aid;
+function sbAssets(){const B=()=>SB.storage.from('pdf'),code=e=>{const m=String(e&&e.message||e||'');return {code:/maximum allowed size|too large|413/i.test(m)?'too_large':/mime/i.test(m)?'unsupported_type':/row-level security|unauthorized|403/i.test(m)?'not_granted':/bucket not found|not found/i.test(m)?'no_bucket':'upstream_error',message:m}};
+  return {
+    upload:async blob=>{const path=AUTHU.id+'/'+(crypto.randomUUID?crypto.randomUUID():uid()+uid()+uid())+'.pdf';const r=await B().upload(path,blob,{contentType:'application/pdf',upsert:false});if(r.error)throw code(r.error);return {id:path,url:pdfUrl(path),sizeBytes:blob.size,contentType:'application/pdf'}},
+    list:async()=>{const r=await B().list(AUTHU.id,{limit:1000,sortBy:{column:'created_at',order:'asc'}});if(r.error)throw code(r.error);const assets=(r.data||[]).filter(x=>x.id).map(x=>({id:AUTHU.id+'/'+x.name,url:pdfUrl(AUTHU.id+'/'+x.name),contentType:(x.metadata&&x.metadata.mimetype)||'application/pdf',sizeBytes:(x.metadata&&x.metadata.size)||0,createdAt:x.created_at||new Date().toISOString()}));
+      return {assets,usage:{files:assets.length,bytes:assets.reduce((t,a)=>t+a.sizeBytes,0)}}},
+    delete:async id=>{if(!String(id).includes('/'))return {deleted:false};const r=await B().remove([id]);if(r.error)throw code(r.error);return {deleted:true}}}}
 function loadPdfLib(){return new Promise((res,rej)=>{if(window.PDFLib)return res();const sc=document.createElement('script');sc.src='https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js';sc.onload=()=>res();sc.onerror=()=>rej({code:'split'});document.head.appendChild(sc)})}
 async function splitPdf(file){
   let src;try{await loadPdfLib();src=await PDFLib.PDFDocument.load(new Uint8Array(await file.arrayBuffer()))}catch(e){console.log('[k-Koçluk] pdf',e);throw {code:'split'}}
@@ -946,7 +954,7 @@ function loadPdfJs(){return new Promise((res,rej)=>{if(window.pdfjsLib&&window.p
 function pvTop(title,info){return `<div class="pv-top"><h2>${esc(title)}</h2><div class="row" style="align-items:center;gap:8px"><small class="num" id="pv-info">${info||''}</small><button class="btn sm" data-a="pvZoom" data-d="-1" aria-label="Küçült">−</button><button class="btn sm" data-a="pvZoom" data-d="1" aria-label="Büyüt">+</button><button class="btn primary" data-a="pvClose">Kapat</button></div></div>`}
 async function openPdf(aid,title){const pv=document.getElementById('pv');pvClose();pv.hidden=false;document.body.style.overflow='hidden';document.body.classList.toggle('split',!!OPT);
   pv.innerHTML=pvTop(title)+'<div class="pv-b" id="pv-b"><p class="empty">PDF açılıyor…</p></div>';const my=PV={aid,zoom:1,doc:null,io:null};
-  try{await loadPdfJs();const r=await fetch('/_blob/'+aid);if(!r.ok)throw new Error('http '+r.status);const data=new Uint8Array(await r.arrayBuffer());
+  try{await loadPdfJs();const r=await fetch(pdfUrl(aid));if(!r.ok)throw new Error('http '+r.status);const data=new Uint8Array(await r.arrayBuffer());
     const doc=await pdfjsLib.getDocument({data}).promise;if(PV!==my){doc.destroy();return}my.doc=doc;await pvLayout()}
   catch(e){console.log('[k-Koçluk] pdf',e);if(PV===my){const b=document.getElementById('pv-b');if(b)b.innerHTML='<p class="note">PDF açılamadı. Sayfayı yenileyip tekrar dene; yine olmazsa dosyayı silip yeniden yükle.</p>'}}}
 async function pvLayout(){const my=PV,b=document.getElementById('pv-b');if(!my||!my.doc||!b)return;if(my.io)my.io.disconnect();
@@ -963,8 +971,8 @@ function pvClose(){const pv=document.getElementById('pv');if(PV){if(PV.io)PV.io.
 function dropAssets(files){if(!files||!files.length)return;Promise.all(files.map(f=>AS?.delete(f.aid).catch(()=>{}))).then(refreshAssets).then(()=>{if(S.ui.view==='kitaplar')render()})}
 VIEWS.kitaplar=()=>{
   const s=st(),used=new Set([...S.books.flatMap(b=>b.files),...S.exams.flatMap(e=>e.pdf||[])].map(f=>f.aid)),orph=(ASL||[]).filter(a=>a.contentType==='application/pdf'&&!used.has(a.id));
-  return `${head('PDF kitaplar',ASU?`<span class="pill mut">${mb(ASU.bytes)} / ${mb(ASU.maxBytes)} dolu</span>`:'')}
-  <section class="card"><div class="card-h"><h2>Kitap yükle</h2><small>20 MB'tan büyük PDF'ler otomatik olarak bölümlere ayrılır</small></div>
+  return `${head('PDF kitaplar',ASU?`<span class="pill mut">${ASU.files} dosya · ${mb(ASU.bytes)}</span>`:'')}
+  <section class="card"><div class="card-h"><h2>Kitap yükle</h2><small>45 MB'tan büyük PDF'ler otomatik olarak bölümlere ayrılır</small></div>
     ${!ASREADY?'<p class="empty">Dosya alanı hazırlanıyor…</p>':AS?`<div class="row"><label class="f grow"><span>PDF dosyaları (birden fazla seçebilirsin)</span><input type="file" id="bk-file" accept="application/pdf,.pdf" multiple data-c="bookFiles" ${BK.busy?'disabled':''}></label></div>`:asNote()}
     <p class="note" id="bk-status" ${BK.msg?'':'hidden'}>${esc(BK.msg)}</p>
   </section>
@@ -1320,7 +1328,7 @@ async function studentEnter(tok,keep){if(!keep)showGate('loading');let v=null;
     try{localStorage.removeItem(STOK)}catch(e){}STUDENT=null;showGate('slogin','',v&&v.error==='session'?'Oturumun kapandı. Yeniden giriş yap.':'Hesabın bulunamadı. Koçunla iletişime geç.');return}
   (v.data.exams||[]).forEach(e=>(e.sections||[]).forEach(sec=>{if(!Array.isArray(sec.key))sec.key=Array(sec.count).fill(null);if(!Array.isArray(sec.topics))sec.topics=Array(sec.count).fill(null)}));
   const ui=keep&&S?{view:S.ui.view,week:S.ui.week,examId:S.ui.examId,examMode:S.ui.examMode,cur:st()?.curId}:null;
-  AUTHU=null;ME=null;VIEW=null;PARENT=null;STUDENT={tok,coach:v.coach||'Koç',username:v.username||''};
+  AS=null;ASL=null;ASU=null;AUTHU=null;ME=null;VIEW=null;PARENT=null;STUDENT={tok,coach:v.coach||'Koç',username:v.username||''};
   init(v.data);applyOps(v.ops||[],v.data.active);S.stuMode=true;
   if(!keep){try{const q=JSON.parse(localStorage.getItem(STOK+':q')||'[]');if(Array.isArray(q)&&q.length){SQ=q;applyOps(q,v.data.active)}}catch(e){}}
   if(ui){Object.assign(S.ui,{view:ui.view,week:ui.week,examId:ui.examId,examMode:ui.examMode});if(ui.cur&&(st()?.curIds||[]).includes(ui.cur))st().curId=ui.cur}else S.ui.view='program';
@@ -1363,7 +1371,7 @@ async function parentEnter(tok){showGate('loading');let v=null;
   try{const r=await SB.rpc('parent_view',{p_token:tok});if(r.error)throw r.error;v=r.data}catch(e){showGate('perror','',aerr(e));return}
   if(!v||!v.ok||!v.data){showGate(v&&v.error==='inactive'?'pinactive':'pnotfound');return}
   const keep=PARENT&&S?{view:S.ui.view,week:S.ui.week,cur:st()?.curId}:null;
-  AUTHU=null;ME=null;VIEW=null;PARENT={tok,coach:v.coach||'Koç'};init(v.data);applyOps(v.ops||[],v.data.active);S.stuMode=false;S.ui.view=keep?keep.view:'veli';S.ui.week=keep?keep.week:0;S.ui.examId=null;
+  AS=null;ASL=null;ASU=null;AUTHU=null;ME=null;VIEW=null;PARENT={tok,coach:v.coach||'Koç'};init(v.data);applyOps(v.ops||[],v.data.active);S.stuMode=false;S.ui.view=keep?keep.view:'veli';S.ui.week=keep?keep.week:0;S.ui.examId=null;
   if(keep&&keep.cur&&(st()?.curIds||[]).includes(keep.cur))st().curId=keep.cur;
   showApp();render()}
 VIEWS.veli=()=>{
@@ -1423,7 +1431,7 @@ async function enter(user){
   let row=null;try{const r=await SB.from('coach_state').select('data,updated_at').eq('coach_id',user.id).maybeSingle();if(r.error)throw r.error;row=r.data}catch(e){showGate('error','',aerr(e));return}
   let local=null;try{if(localStorage.getItem(KEY+':pending:'+user.id)){const o=JSON.parse(localStorage.getItem(KEY+':'+user.id));if(o&&o.v===1)local=o}}catch(e){}
   VIEW=null;MYS=null;ADM.rows=null;PL.map=null;PARENT=null;STUDENT=null;CLOUD.at=row&&row.updated_at;CLOUD.err='';CLOUD.dirty=false;
-  SA.map=null;if(local){init(local);cloudDirty()}else if(row&&row.data&&row.data.v===1)init(row.data);else{init(seed());showApp();render();save();return}
+  SA.map=null;AS=sbAssets();ASU=null;ASL=null;refreshAssets().then(()=>{if(S&&S.ui.view==='kitaplar'&&!BK.busy)render()});if(local){init(local);cloudDirty()}else if(row&&row.data&&row.data.v===1)init(row.data);else{init(seed());showApp();render();save();return}
   showApp();render();absorbOps()}
 async function boot(){
   if(!window.supabase||!window.supabase.createClient){showGate('error','','Uygulamanın bir parçası yüklenemedi. Sayfayı yenile.');return}
@@ -1476,13 +1484,13 @@ Kullanıcı adı: ${esc(v.username)}
   saCopy:()=>copyFrom('sa-out','Giriş bilgisi kopyalandı'),
   saRemove:()=>{if(!SAE)return;const id=SAE.id,x=S.students.find(q=>q.id===id);ask('Emin misin?',`${x?x.name:'Öğrenci'} artık kullanıcı adı ve şifresiyle giremeyecek. Kayıtları silinmez.`,async()=>{
       try{const r=await SB.from('student_accounts').delete().eq('coach_id',AUTHU.id).eq('student_id',id);if(r.error)throw r.error;delete SA.map[id];commit('Öğrenci girişi kaldırıldı')}catch(e){toast(aerr(e))}})},
-  signOut:async()=>{if(CLOUD.dirty&&!VIEW){try{await cloudSave()}catch(e){}}try{await SB.auth.signOut()}catch(e){}AUTHU=null;ME=null;VIEW=null;MYS=null;ADM.rows=null;closeOptik&&OPT&&closeOptik();showGate('login')},
+  signOut:async()=>{if(CLOUD.dirty&&!VIEW){try{await cloudSave()}catch(e){}}try{await SB.auth.signOut()}catch(e){}AS=null;ASL=null;ASU=null;AUTHU=null;ME=null;VIEW=null;MYS=null;ADM.rows=null;closeOptik&&OPT&&closeOptik();showGate('login')},
   admLoad:()=>admLoad(true),
   admSet:async el=>{const id=el.dataset.id,f=el.dataset.f,v=el.dataset.v==='1';await admUpdate(id,{[f]:v},f==='approved'?(v?'Koç onaylandı':'Onay kaldırıldı'):(v?'Hesap donduruldu':'Dondurma kaldırıldı'))},
   admView:async el=>{const row=(ADM.rows||[]).find(r=>r.id===el.dataset.id);if(!row)return;try{const r=await SB.from('coach_state').select('data').eq('coach_id',row.id).maybeSingle();if(r.error)throw r.error;
       if(!r.data||!r.data.data||r.data.data.v!==1){toast('Bu koçun henüz kaydı yok');return}
-      if(CLOUD.dirty)await cloudSave();if(!VIEW)MYS=JSON.stringify(S);VIEW={id:row.id,name:row.full_name||row.email};init(r.data.data);S.stuMode=false;S.ui.view='ozet';S.ui.examId=null;render();window.scrollTo(0,0)}catch(e){toast(aerr(e))}},
-  viewExit:()=>{if(!VIEW)return;VIEW=null;const o=MYS?JSON.parse(MYS):seed();MYS=null;init(o);S.ui.view='yonetici';render();window.scrollTo(0,0)},
+      if(CLOUD.dirty)await cloudSave();if(!VIEW)MYS=JSON.stringify(S);AS=null;ASL=null;VIEW={id:row.id,name:row.full_name||row.email};init(r.data.data);S.stuMode=false;S.ui.view='ozet';S.ui.examId=null;render();window.scrollTo(0,0)}catch(e){toast(aerr(e))}},
+  viewExit:()=>{if(!VIEW)return;AS=sbAssets();refreshAssets();VIEW=null;const o=MYS?JSON.parse(MYS):seed();MYS=null;init(o);S.ui.view='yonetici';render();window.scrollTo(0,0)},
   admDel:el=>{const row=(ADM.rows||[]).find(r=>r.id===el.dataset.id);if(!row)return;ask('Emin misin?',`“${row.full_name||row.email}” adlı koç ve tüm kayıtları (öğrenciler, planlar, denemeler) kalıcı olarak silinecek. Bu işlem geri alınamaz.`,async()=>{
       try{const r=await SB.rpc('admin_delete_coach',{target:row.id});if(r.error)throw r.error;toast(String(r.data||'Silindi'));await admLoad(true)}catch(e){toast(aerr(e))}})}
 });
