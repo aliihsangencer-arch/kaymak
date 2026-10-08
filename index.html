@@ -252,6 +252,47 @@ body.pmode main input,body.pmode main select,body.pmode main textarea,body.pmode
 .dlg-b{display:flex;gap:10px;justify-content:flex-end}
 .btn.danger{background:var(--bad);border-color:var(--bad);color:#fff}
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+
+/* ---------- telefon: uygulama görünümü ---------- */
+#tabbar{display:none}
+body.mob{-webkit-tap-highlight-color:transparent;overscroll-behavior-y:none}
+body.mob .app{display:block}
+body.mob .side{position:sticky;top:0;z-index:30;height:auto;padding:0;gap:0;border:0;background:var(--accent);color:#fff;box-shadow:0 2px 10px rgba(0,0,0,.15)}
+body.mob main{padding:16px 16px calc(88px + env(safe-area-inset-bottom,0px));gap:16px}
+body.mob .ph>div:first-child{display:none}
+body.mob .ph:not(:has(.ph-r>*)){display:none}
+.abar{display:flex;align-items:center;gap:6px;min-height:56px;padding:6px 8px 6px 4px}
+.abar .ab-t{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.2}
+.abar .ab-t b{font:600 18px var(--display);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.abar .ab-t small{color:#fff;opacity:.85;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ab-btn{all:unset;cursor:pointer;width:44px;height:44px;display:grid;place-items:center;border-radius:50%;flex:none}
+.ab-btn:active{background:rgba(255,255,255,.18)}
+.ab-btn svg{width:24px;height:24px}
+.ahome{padding:14px 16px 16px;display:flex;flex-direction:column;gap:12px}
+.ahome .abrand{display:flex;align-items:center;gap:10px;font:700 22px var(--display)}
+.ahome .logo{border-color:#fff;color:#fff}.ahome .logo::after{background:#F2B544}
+.ahome select{width:100%;background:rgba(255,255,255,.16);color:#fff;border:1px solid rgba(255,255,255,.35);border-radius:10px;padding:10px 12px;font-weight:600}
+.ahome select option{color:#111}
+.ahome .alab{font-size:11px;letter-spacing:.08em;text-transform:uppercase;opacity:.8;margin-bottom:-6px}
+.hsec{display:flex;flex-direction:column;gap:10px}
+.hsec h2{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:4px 2px 0}
+.tiles-h{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.tl{all:unset;cursor:pointer;box-sizing:border-box;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:10px;min-height:118px;box-shadow:0 1px 2px rgba(0,0,0,.04);transition:transform .08s}
+.tl:active{transform:scale(.97);background:var(--surface-2)}
+.tl .ic{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent)}
+.tl .ic svg{width:24px;height:24px}
+.tl b{font-weight:600;font-size:15px;line-height:1.25}
+.tl small{color:var(--muted);font-size:12px;line-height:1.3;margin-top:-6px}
+.tl.k2 .ic{background:#FDF1D8;color:#9A6400}
+.acct{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px 14px;display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between;font-size:13px;color:var(--muted)}
+body.mob #tabbar{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:40;background:var(--surface);border-top:1px solid var(--line);padding:6px 4px calc(6px + env(safe-area-inset-bottom,0px));box-shadow:0 -2px 10px rgba(0,0,0,.06)}
+#tabbar button{all:unset;cursor:pointer;flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;font-weight:500;color:var(--muted);padding:4px 0;border-radius:10px}
+#tabbar button svg{width:24px;height:24px}
+#tabbar button.on{color:var(--accent);font-weight:600}
+#tabbar button.on svg{background:var(--accent-soft);border-radius:12px;padding:2px 14px;box-sizing:content-box}
+body.mob .tiles{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+body.mob .tile{padding:12px}
+body.mob .toast{bottom:calc(84px + env(safe-area-inset-bottom,0px))}
 </style>
 
 <div class="app" id="app" hidden>
@@ -262,6 +303,7 @@ body.pmode main input,body.pmode main select,body.pmode main textarea,body.pmode
 <div class="toast" id="toast" hidden></div>
 <div class="pv" id="pv" hidden></div>
 <div class="dlg-bg" id="dlg" hidden></div>
+<nav id="tabbar" aria-label="Alt menü"></nav>
 <div class="gate" id="gate"><div class="gate-c"><div class="brand"><span class="logo">k</span><b>k-Koçluk</b></div><p class="muted">Yükleniyor…</p></div></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
@@ -1116,13 +1158,47 @@ VIEWS.yedek=()=>`${head('Yedek ve veriler')}
   </div>`;
 
 /* ---------- çizim ---------- */
+/* ---------- telefon: uygulama görünümü ---------- */
+const MQ=matchMedia('(max-width:760px)');let MOB=MQ.matches,MOBINIT=false;
+const IC={ana:'M3 11l9-8 9 8v10h-6v-6H9v6H3z',ozet:'M3 13h8V3H3zM13 21h8V11h-8zM3 21h8v-6H3zM13 3v6h8V3z',program:'M3 5h18v16H3zM3 9h18M8 3v4M16 3v4',plan:'M10 6h11M10 12h11M10 18h11M3 6l1.5 1.5L7 5M3 12l1.5 1.5L7 11M3 18l1.5 1.5L7 17',dagilim:'M12 3v9h9A9 9 0 1 1 12 3zM15 3.5A9 9 0 0 1 20.5 9H15z',konular:'M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2zM4 21V5M9 8h6',matris:'M3 3h18v18H3zM3 9h18M3 15h18M9 3v18M15 3v18',kitaplar:'M14 3H6v18h12V7zM14 3v4h4M9 13h6M9 17h6',sorular:'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17h.01',denemeler:'M9 3h6v3H9zM7 5H5v16h14V5h-2M9 14l2 2 4-4',cikmis:'M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l3 2',rapor:'M4 4h16v12H8l-4 4zM8 9h8M8 12h5',veli:'M4 4h16v12H8l-4 4zM8 9h8M8 12h5',dersler:'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 3',ucretler:'M3 7h18v13H3zM3 7l3-4h12l3 4M16 13h2',ogrenciler:'M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21v-1a6 6 0 0 1 12 0v1M16 3.5a4 4 0 0 1 0 7M22 21v-1a6 6 0 0 0-4-5.6',mufredat:'M12 3l9 5-9 5-9-5zM3 12l9 5 9-5M3 16l9 5 9-5',yedek:'M7 18a5 5 0 1 1 .9-9.9A6 6 0 0 1 19 10a4 4 0 0 1-1 8M12 12v8M9 15l3-3 3 3',yonetici:'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z',back:'M15 5l-7 7 7 7',out:'M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10'};
+const svgI=k=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${IC[k]||IC.ozet}"/></svg>`;
+const DESC={ozet:'Genel durum',program:'Görevler ve günlük plan',plan:'Konuları haftalara yerleştir',dagilim:'Konular ve ilerleme',konular:'Konular ve kaynaklar',matris:'Test test takip',kitaplar:'Kitap PDF’leri',sorular:'Günlük çözülen soru',denemeler:'Sınav ve optik form',cikmis:'Yıllara göre sorular',rapor:'Veliye haftalık rapor',veli:'Haftalık özet',dersler:'Takvim ve dersler',ucretler:'Ödeme ve bakiye',ogrenciler:'Ekle, düzenle, giriş',mufredat:'Ders ve konu yapısı',yedek:'Dışa aktar, geri yükle',yonetici:'Koçlar ve bedeller'};
+const COACH_ONLY=['dersler','ucretler','ogrenciler','mufredat','yedek','yonetici'];
+const navList=()=>PARENT?PARENT_NAV:S.stuMode?NAV.filter(([v])=>STU_VIEWS.includes(v)):ME?.role==='admin'?[...NAV,['yonetici','Yönetici']]:NAV;
+const navLabel=v=>(navList().find(x=>x[0]===v)||NAV.find(x=>x[0]===v)||[v,'K-Koçluk'])[1];
+const tile=([v,l],k2)=>`<button class="tl ${k2?'k2':''}" data-a="go" data-v="${v}"><span class="ic">${svgI(v)}</span><b>${esc(l)}</b><small>${DESC[v]||''}</small></button>`;
+VIEWS.ana=()=>{const L=navList(),a=L.filter(([v])=>!COACH_ONLY.includes(v)),b=L.filter(([v])=>COACH_ONLY.includes(v));
+  return `<section class="hsec"><h2>${PARENT?'Veli':S.stuMode?'Çalışmam':'Öğrenci'}</h2><div class="tiles-h">${a.map(x=>tile(x)).join('')}</div></section>
+  ${b.length?`<section class="hsec"><h2>Koç</h2><div class="tiles-h">${b.map(x=>tile(x,1)).join('')}</div></section>`:''}
+  <div class="acct"><span>${STUDENT?`<span id="sync">${stuSyncText()}</span> · Koç: ${esc(STUDENT.coach)}`:PARENT?`Koç: ${esc(PARENT.coach)} · yalnızca görüntüleme`:`<span id="sync">${syncText()}</span><br>${esc(ME?.email||'')}`}</span>
+  <span class="row" style="gap:6px">${STUDENT?'<button class="btn sm" data-a="stuLogout">Çıkış</button>':PARENT?'':S.stuMode?'<button class="btn sm" data-a="coachMode">Koç girişi</button>':'<button class="btn sm" data-a="stuMode">Öğrenci modu</button><button class="btn sm" data-a="signOut">Çıkış</button>'}</span></div>`};
+function mobBar(){const s=st(),v=S.ui.view;
+  if(v==='ana'){const cs=s&&(s.curIds||[]).length>1;return `<div class="ahome"><div class="abrand"><span class="logo">k</span>K-Koçluk</div>
+    ${PARENT?`<div>${esc(s?.name||'')}</div>`:`<span class="alab">Öğrenci</span><select id="active" data-c="active" aria-label="Öğrenci" ${S.stuMode?'disabled':''}>${S.students.map(x=>`<option value="${x.id}" ${s&&x.id===s.id?'selected':''}>${esc(x.name)}</option>`).join('')||'<option>—</option>'}</select>`}
+    ${cs?`<select id="active-cur" data-c="activeCur" aria-label="Sınav">${s.curIds.map(i=>curById(i)).filter(Boolean).map(c=>`<option value="${c.id}" ${c.id===curOf(s).id?'selected':''}>${esc(c.name)}</option>`).join('')}</select>`:''}</div>`}
+  const sub=COACH_ONLY.includes(v)?'Koç · tüm öğrenciler':s?`${s.name}${(s.curIds||[]).length>1?' · '+curOf(s).name:''}`:'';
+  return `<div class="abar"><button class="ab-btn" data-a="home" aria-label="Ana sayfa">${svgI('back')}</button><div class="ab-t"><b>${esc(navLabel(v))}</b>${sub?`<small>${esc(sub)}</small>`:''}</div></div>`}
+function tabBar(){const t=document.getElementById('tabbar');if(!MOB){t.innerHTML='';return}
+  const L=PARENT?[['ana','Ana sayfa'],['veli','Rapor'],['program','Program'],['denemeler','Denemeler']]:S.stuMode?[['ana','Ana sayfa'],['program','Program'],['matris','Takip'],['denemeler','Denemeler']]:[['ana','Ana sayfa'],['program','Program'],['denemeler','Denemeler'],['dersler','Derslerim']];
+  t.innerHTML=L.map(([v,l])=>`<button class="${S.ui.view===v?'on':''}" data-a="${v==='ana'?'home':'go'}" data-v="${v}">${svgI(v)}<span>${l}</span></button>`).join('')}
+function mobNav(to){if(!MOB)return;const st0=history.state&&history.state.k==='page';if(to==='ana')return;if(!st0)history.pushState({k:'page'},'')}
+window.addEventListener('popstate',()=>{if(!MOB)return;
+  if(!document.getElementById('pv').hidden||!document.getElementById('ov').hidden||!document.getElementById('dlg').hidden){
+    if(!document.getElementById('dlg').hidden)closeAsk();else if(OPT)closeOptik();else pvClose();
+    if(S.ui.view!=='ana')history.pushState({k:'page'},'');return}
+  if(S.ui.examId){S.ui.examId=null;S.ui.examMode=null;history.pushState({k:'page'},'');render();return}
+  if(S.ui.view!=='ana'){S.ui.view='ana';render();window.scrollTo(0,0)}});
+MQ.addEventListener('change',e=>{MOB=e.matches;if(!MOB&&S&&S.ui.view==='ana')S.ui.view=PARENT?'veli':S.stuMode?'matris':'ozet';if(S&&!document.getElementById('app').hidden)render()});
+
 const NAV=[['ozet','Özet'],['program','Haftalık program'],['plan','Konu planı'],['dagilim','Konu dağılımı'],['konular','Konu ve kaynak'],['matris','Kaynak takibi'],['kitaplar','PDF kitaplar'],['sorular','Soru takibi'],['denemeler','Denemeler'],['cikmis','Çıkmış sorular'],['rapor','Veli raporu'],['dersler','Ders programım'],['ucretler','Alacak / verecek'],['ogrenciler','Öğrenciler'],['mufredat','Müfredat'],['yedek','Yedek']];
 const STU_VIEWS=['program','dagilim','matris','denemeler','kitaplar'],STU_DENY=new Set(['resetExam','del','mxMinus','mxClear','pastRm','clearPlan','resetAll','restore']),STU_COACH=new Set(['optPause','openPlan','copyWeek','newExam','setKey','pasteKey','bulkTopic','addSec']);
 function render(){
-  document.body.classList.toggle('pmode',!!PARENT);if(PARENT&&!PARENT_NAV.some(([v])=>v===S.ui.view))S.ui.view='veli';
-  document.body.classList.toggle('smode',!!S.stuMode);if(S.stuMode&&!STU_VIEWS.includes(S.ui.view))S.ui.view='matris';if(S.stuMode&&S.ui.examMode==='edit'){S.ui.examId=null;S.ui.examMode=null}
+  if(MOB&&!MOBINIT){MOBINIT=true;S.ui.view='ana';S.ui.examId=null}if(!MOB&&S.ui.view==='ana')S.ui.view=PARENT?'veli':S.stuMode?'matris':'ozet';
+  document.body.classList.toggle('mob',MOB);
+  document.body.classList.toggle('pmode',!!PARENT);if(PARENT&&S.ui.view!=='ana'&&!PARENT_NAV.some(([v])=>v===S.ui.view))S.ui.view='veli';
+  document.body.classList.toggle('smode',!!S.stuMode);if(S.stuMode&&S.ui.view!=='ana'&&!STU_VIEWS.includes(S.ui.view))S.ui.view='matris';if(S.stuMode&&S.ui.examMode==='edit'){S.ui.examId=null;S.ui.examMode=null}
   const s=st();
-  document.getElementById('side').innerHTML=`<div class="side-top"><div class="brand"><span class="logo">k</span><b>k-Koçluk</b></div>${PARENT?`<div><span class="pill mut">Veli görünümü</span>${s&&(s.curIds||[]).length>1?`<div style="margin-top:8px"><select id="active-cur" data-c="activeCur" aria-label="Sınav" style="width:100%">${s.curIds.map(i=>curById(i)).filter(Boolean).map(c=>`<option value="${c.id}" ${c.id===curOf(s).id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div>`:''}</div>`:''}
+  tabBar();if(MOB){document.getElementById('side').innerHTML=mobBar()}else document.getElementById('side').innerHTML=`<div class="side-top"><div class="brand"><span class="logo">k</span><b>k-Koçluk</b></div>${PARENT?`<div><span class="pill mut">Veli görünümü</span>${s&&(s.curIds||[]).length>1?`<div style="margin-top:8px"><select id="active-cur" data-c="activeCur" aria-label="Sınav" style="width:100%">${s.curIds.map(i=>curById(i)).filter(Boolean).map(c=>`<option value="${c.id}" ${c.id===curOf(s).id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div>`:''}</div>`:''}
     <div class="who"><label for="active">Öğrenci</label><select id="active" data-c="active" style="width:100%" ${S.stuMode?'disabled':''}>${S.students.map(x=>`<option value="${x.id}" ${s&&x.id===s.id?'selected':''}>${esc(x.name)}</option>`).join('')||'<option>—</option>'}</select>${s&&(s.curIds||[]).length>1?`<label for="active-cur" style="margin-top:8px">Sınav</label><select id="active-cur" data-c="activeCur" style="width:100%">${s.curIds.map(i=>curById(i)).filter(Boolean).map(c=>`<option value="${c.id}" ${c.id===curOf(s).id?'selected':''}>${esc(c.name)}</option>`).join('')}</select>`:''}<div class="mode">${STUDENT?`<span class="pill ext">${esc(STUDENT.username)}</span><button class="btn sm link" data-a="stuLogout">Çıkış</button>`:S.stuMode?'<span class="pill warn">Öğrenci modu</span><button class="btn sm link" data-a="coachMode">Koç girişi</button>':'<button class="btn sm link" data-a="stuMode">Öğrenci moduna geç</button><button class="btn sm link" data-a="signOut">Çıkış</button>'}</div></div></div>
     <nav class="nav">${(PARENT?PARENT_NAV:S.stuMode?NAV.filter(([v])=>STU_VIEWS.includes(v)):ME?.role==='admin'?[...NAV,['yonetici','Yönetici']]:NAV).map(([v,l])=>`<button class="${S.ui.view===v?'on':''}" data-a="go" data-v="${v}">${l}</button>`).join('')}</nav>
     <p class="side-foot">${STUDENT?`<span id="sync">${stuSyncText()}</span><br>Koç: ${esc(STUDENT.coach)}`:PARENT?`Koç: ${esc(PARENT.coach)}<br>Yalnızca görüntüleme`:`<span id="sync">${syncText()}</span><br>${esc(ME?.email||'')}`}</p>`;
@@ -1156,7 +1232,8 @@ function closeOptik(){pvClose();accrue();clearInterval(openOptik.iv);OPT=null;ov
 
 /* ---------- eylemler ---------- */
 const A={
-  go:el=>{S.ui.view=el.dataset.v;if(el.dataset.v==='denemeler'){S.ui.examId=null}commit();window.scrollTo(0,0)},
+  home:()=>{if(MOB&&history.state&&history.state.k==='page'){history.back();return}S.ui.view='ana';S.ui.examId=null;commit();window.scrollTo(0,0)},
+  go:el=>{mobNav(el.dataset.v);S.ui.view=el.dataset.v;if(el.dataset.v==='denemeler'){S.ui.examId=null}commit();window.scrollTo(0,0)},
   week:el=>{const d=+el.dataset.d;S.ui.week=d===0?0:S.ui.week+d;commit()},
   pick:el=>{S.active=el.dataset.id;commit('Öğrenci seçildi')},
   addTask:()=>{const s=st();let topic=val('tk-topic'),topicNm='';if(topic==='__other'){topicNm=val('tk-x').trim();if(!topicNm){toast('Konu adını yaz');return}topic=''}
@@ -1509,7 +1586,7 @@ function saSuggest(name){const m={'ç':'c','ğ':'g','ı':'i','ö':'o','ş':'s','
 function saPass(){const A2='abcdefghjkmnpqrstuvwxyz23456789',u=new Uint32Array(8);crypto.getRandomValues(u);return Array.from(u,x=>A2[x%A2.length]).join('')}
 
 /* veli bağlantısı */
-let PARENT=null;const PARENT_NAV=[['veli','Haftalık rapor'],['program','Haftalık program'],['denemeler','Denemeler'],['dagilim','Konu dağılımı'],['matris','Kaynak takibi']],PARENT_OK=new Set(['go','week','openExam','back','openPdf','pvClose','pvZoom','gateRetry']);
+let PARENT=null;const PARENT_NAV=[['veli','Haftalık rapor'],['program','Haftalık program'],['denemeler','Denemeler'],['dagilim','Konu dağılımı'],['matris','Kaynak takibi']],PARENT_OK=new Set(['go','home','week','openExam','back','openPdf','pvClose','pvZoom','gateRetry']);
 const PL={map:null,busy:false,err:''};
 const plUrl=tok=>location.origin+location.pathname+'#veli='+tok;
 async function plLoad(){if(!SB||!AUTHU||VIEW)return;PL.busy=true;try{const r=await SB.from('parent_links').select('token,student_id').eq('coach_id',AUTHU.id);if(r.error)throw r.error;PL.map={};r.data.forEach(x=>PL.map[x.student_id]=x.token);PL.err=''}
