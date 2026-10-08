@@ -396,6 +396,10 @@ const G4TR=[["Harf, Hece ve Sözcük Bilgisi",36,["Harf bilgisi ve alfabetik sı
 function fixG4(o){(o.curricula||[]).forEach(c=>{if(c.lib!=='g:g4')return;const sb=c.subjects.find(x=>x.name==='Türkçe');if(!sb||!sb.topics.some(t=>t.name==='Okulum Açılıyor'))return;
   const ids=new Set(sb.topics.map(t=>t.id)),used=JSON.stringify([o.plans,o.progress,o.tasks,o.exams,o.mx||null]);if([...ids].some(i=>used.includes('"'+i+'"')))return;
   sb.topics=G4TR.flatMap(([un,h,ts])=>ts.map(t=>({id:uid(),name:t,unit:un,w:Math.round(h/ts.length*10)/10})))})}
+const g4Old=c=>c&&c.lib==='g:g4'&&c.subjects.some(x=>x.name==='Türkçe'&&x.topics.some(t=>t.name==='Okulum Açılıyor'));
+function g4Card(c){if(VIEW||S.stuMode||PARENT||!g4Old(c))return '';return `<section class="card" style="border-color:var(--warn)"><div class="card-h"><h2>4. sınıf Türkçe konuları güncellendi</h2></div>
+  <p class="muted">“${esc(c.name)}” müfredatındaki Türkçe başlıkları ders kitabındaki metinlerin adlarıydı (ör. “Okulum Açılıyor”). Bunları dil bilgisi ve okuma-anlama konularıyla değiştirebilirsin.</p>
+  <div><button class="btn primary" data-a="g4Fix" data-id="${c.id}">Türkçe konularını güncelle</button></div></section>`}
 function migrate(o){fixG4(o);o.lessons=Array.isArray(o.lessons)?o.lessons:[];o.fees=Array.isArray(o.fees)?o.fees:[];o.pays=Array.isArray(o.pays)?o.pays:[];o.rates=o.rates||{};o.monthly=o.monthly||{};o.monSkip=o.monSkip||{};o.fees.forEach(f=>{(f.payments||[]).forEach(q=>o.pays.push({id:uid(),sid:f.sid,name:f.name,amount:+q.amount||0,date:q.date,note:f.note||''}));delete f.payments});o.lessons.forEach(l=>{if(l.done&&l.fee==null)l.fee=Math.round((+o.rates[l.sid]||0)*l.min/60*100)/100});o.plans=o.plans||{};o.books=Array.isArray(o.books)?o.books:[];o.progress=o.progress||{};(o.students||[]).forEach(s=>{if(!s.startDate)s.startDate=iso(mondayOf(today()));if(!s.examDate)s.examDate=DEF_EXAM();if(s.reviewWeeks==null)s.reviewWeeks=2;if(!Array.isArray(s.curIds))s.curIds=s.curId?[s.curId]:[];if(s.curId&&!s.curIds.includes(s.curId))s.curIds.unshift(s.curId);if(s.planBuilt&&s.planEdited==null)s.planEdited=true});return o}
 function init(o){S=migrate(o);S.ui=Object.assign({view:'ozet',week:0,examId:null,examMode:null,curId:null,editStudent:null,editTask:null,openSec:0},S.ui||{});
   S.students.forEach(s=>{if(!s.autoPlan)return;delete s.autoPlan;
@@ -618,6 +622,7 @@ VIEWS.plan=()=>{
     </div>
     <p class="note">İstersen aşağıdaki “Otomatik plan oluştur” ile konuları sürelerine göre haftalara dağıtırsın; istersen elle yaparsın. Konuları aşağıdaki “Plana yerleştirilmemiş konular” listesinden bir haftaya ata ya da haftanın içindeki “Konu ekle”yi kullan. Bir konuyu birden fazla haftaya koyabilir, değiştirebilir, taşıyabilir, silebilirsin. Listede olmayan bir konu için “Diğer”i seç.</p>
   </section>
+  ${g4Card(cur)}
   ${autoCard(s)}
   ${pastCard}
   ${(()=>{const placed=new Set(Object.values(W).flat().map(i=>i.topic).filter(Boolean)),p=prog(s.id),fut=weeks.filter(k=>k>=cm);
@@ -828,6 +833,7 @@ VIEWS.mufredat=()=>{
   const c=curById(S.ui.curId)||S.curricula[0];
   return `${head('Müfredat',`<button class="btn" data-a="newCur">Boş müfredat oluştur</button>`)}
   ${libCard()}
+  ${S.curricula.filter(g4Old).map(g4Card).join('')}
   <section class="card"><div class="card-h"><h2>Müfredatlar</h2><small>Koçluk yaptığın her sınıf ve sınav için bir müfredat</small></div>
     <div class="row" style="gap:6px">${S.curricula.map(x=>`<button class="btn sm ${c&&x.id===c.id?'primary':''}" data-a="pickCur" data-id="${x.id}">${esc(x.name)}</button>`).join('')||'<span class="empty">Henüz müfredat yok.</span>'}</div>
   </section>
@@ -1254,7 +1260,7 @@ window.addEventListener('popstate',()=>{if(!MOB)return;
 MQ.addEventListener('change',e=>{MOB=e.matches;if(S&&S.ui)MOBINIT=true;if(!MOB&&S&&S.ui.view==='ana')S.ui.view=PARENT?'veli':S.stuMode?'matris':'ozet';if(S&&!document.getElementById('app').hidden)render()});
 
 const NAV=[['ozet','Özet'],['program','Haftalık program'],['plan','Konu planı'],['dagilim','Konu dağılımı'],['konular','Konu ve kaynak'],['matris','Kaynak takibi'],['kitaplar','PDF kitaplar'],['sorular','Soru takibi'],['denemeler','Denemeler'],['cikmis','Çıkmış sorular'],['rapor','Veli raporu'],['dersler','Ders programım'],['ucretler','Alacak / verecek'],['ogrenciler','Öğrenciler'],['mufredat','Müfredat'],['yedek','Yedek']];
-const STU_VIEWS=['program','dagilim','matris','denemeler','kitaplar'],STU_DENY=new Set(['resetExam','del','mxMinus','mxClear','pastRm','clearPlan','resetAll','restore']),STU_COACH=new Set(['libAdd','autoPlan','optPause','openPlan','copyWeek','newExam','setKey','pasteKey','bulkTopic','addSec']);
+const STU_VIEWS=['program','dagilim','matris','denemeler','kitaplar'],STU_DENY=new Set(['resetExam','del','mxMinus','mxClear','pastRm','clearPlan','resetAll','restore']),STU_COACH=new Set(['g4Fix','libAdd','autoPlan','optPause','openPlan','copyWeek','newExam','setKey','pasteKey','bulkTopic','addSec']);
 function render(){
   if(MOB&&!MOBINIT){MOBINIT=true;S.ui.view='ana';S.ui.examId=null}if(!MOB&&S.ui.view==='ana')S.ui.view=PARENT?'veli':S.stuMode?'matris':'ozet';
   document.body.classList.toggle('mob',MOB);
@@ -1295,6 +1301,14 @@ function closeOptik(){pvClose();accrue();clearInterval(openOptik.iv);OPT=null;ov
 
 /* ---------- eylemler ---------- */
 const A={
+  g4Fix:el=>{const c=curById(el.dataset.id);if(!g4Old(c))return;const sb=c.subjects.find(x=>x.name==='Türkçe'),ids=new Set(sb.topics.map(t=>t.id));
+    const pl=Object.values(S.plans).reduce((a,P)=>a+Object.values(P.weeks||{}).flat().filter(i=>ids.has(i.topic)).length,0),tk=S.tasks.filter(t=>ids.has(t.topic)).length;
+    ask('Türkçe konuları güncellensin mi?',`${sb.topics.length} eski başlık kaldırılıp ${G4TR.reduce((a,u)=>a+u[2].length,0)} konu eklenecek.${pl?` Konu planındaki bu başlıklara ait ${pl} kayıt silinecek; planı Konu planı sayfasındaki “Otomatik plan oluştur” ile yalnızca Türkçe seçip yeniden oluşturabilirsin.`:''}${tk?` Haftalık programdaki ${tk} görev silinmez; konusu “Diğer” olarak eski adıyla kalır, istersen düzenlersin.`:''}`,()=>{
+      const nm={};sb.topics.forEach(t=>nm[t.id]=t.name);
+      Object.values(S.plans).forEach(P=>Object.keys(P.weeks||{}).forEach(k=>{P.weeks[k]=P.weeks[k].filter(i=>!ids.has(i.topic));if(!P.weeks[k].length)delete P.weeks[k]}));
+      S.tasks.forEach(t=>{if(ids.has(t.topic)){t.topicName=nm[t.topic];t.topic=''}});
+      Object.values(S.progress).forEach(p=>ids.forEach(i=>delete p[i]));
+      sb.topics=G4TR.flatMap(([un,h,ts])=>ts.map(t=>({id:uid(),name:t,unit:un,w:Math.round(h/ts.length*10)/10})));commit('Türkçe konuları güncellendi')})},
   libAdd:()=>{const key=val('lib-key'),c=libBuild(key);if(!c){toast('Müfredatı seç');return}
     const ex=S.curricula.find(x=>x.lib===key);const go=()=>{S.curricula.push(c);S.ui.curId=c.id;S.ui.openSec=null;commit(`${c.name} eklendi · ${c.subjects.length} ders, ${c.subjects.reduce((a,x)=>a+x.topics.length,0)} konu`)};
     if(ex)ask('Zaten var',`“${ex.name}” daha önce eklenmiş. Yeni bir kopyası eklensin mi? Var olan ve öğrencilere atanmış müfredat değişmez.`,go);else go()},
