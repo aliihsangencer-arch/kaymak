@@ -1766,7 +1766,8 @@ async function boot(){
   SB.auth.onAuthStateChange((ev)=>{if(ev==='PASSWORD_RECOVERY')setTimeout(()=>showGate('newpass'),0)});
   let sess=null;try{sess=(await SB.auth.getSession()).data.session}catch(e){}
   if(GATE.mode==='newpass')return;
-  if(sess&&sess.user)await enter(sess.user);else showGate(/ogrenci/.test(location.hash)?'slogin':'login')}
+  if(/ogrenci/.test(location.hash)){showGate('slogin');return}
+  if(sess&&sess.user)await enter(sess.user);else showGate('login')}
 
 Object.assign(A,{
   gateGo:el=>showGate(el.dataset.m),
