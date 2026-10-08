@@ -604,8 +604,9 @@ VIEWS.plan=()=>{
       <label class="f"><span>Sınav tarihi</span><input type="date" data-c="stuField" data-f="examDate" value="${esc(s.examDate)}"></label>
       <button class="btn" data-a="clearPlan">Bu hafta ve sonrasını temizle</button>
     </div>
-    <p class="note">Plan elle yapılır; hiçbir konu kendiliğinden yerleştirilmez. Konuları aşağıdaki “Plana yerleştirilmemiş konular” listesinden bir haftaya ata ya da haftanın içindeki “Konu ekle”yi kullan. Bir konuyu birden fazla haftaya koyabilir, değiştirebilir, taşıyabilir, silebilirsin. Listede olmayan bir konu için “Diğer”i seç.</p>
+    <p class="note">İstersen aşağıdaki “Otomatik plan oluştur” ile konuları sürelerine göre haftalara dağıtırsın; istersen elle yaparsın. Konuları aşağıdaki “Plana yerleştirilmemiş konular” listesinden bir haftaya ata ya da haftanın içindeki “Konu ekle”yi kullan. Bir konuyu birden fazla haftaya koyabilir, değiştirebilir, taşıyabilir, silebilirsin. Listede olmayan bir konu için “Diğer”i seç.</p>
   </section>
+  ${autoCard(s)}
   ${pastCard}
   ${(()=>{const placed=new Set(Object.values(W).flat().map(i=>i.topic).filter(Boolean)),p=prog(s.id),fut=weeks.filter(k=>k>=cm);
     const rows=cur.subjects.map(sb=>({sb,ts:sb.topics.filter(t=>!placed.has(t.id)&&p[t.id]?.status!=='done')})).filter(x=>x.ts.length),n=rows.reduce((a,x)=>a+x.ts.length,0);
@@ -814,6 +815,7 @@ VIEWS.ogrenciler=()=>{
 VIEWS.mufredat=()=>{
   const c=curById(S.ui.curId)||S.curricula[0];
   return `${head('Müfredat',`<button class="btn" data-a="newCur">Boş müfredat oluştur</button>`)}
+  ${libCard()}
   <section class="card"><div class="card-h"><h2>Müfredatlar</h2><small>Koçluk yaptığın her sınıf ve sınav için bir müfredat</small></div>
     <div class="row" style="gap:6px">${S.curricula.map(x=>`<button class="btn sm ${c&&x.id===c.id?'primary':''}" data-a="pickCur" data-id="${x.id}">${esc(x.name)}</button>`).join('')||'<span class="empty">Henüz müfredat yok.</span>'}</div>
   </section>
@@ -1158,6 +1160,54 @@ VIEWS.yedek=()=>`${head('Yedek ve veriler')}
   </div>`;
 
 /* ---------- çizim ---------- */
+/* ---------- hazır müfredat kütüphanesi (mufredat.json) ---------- */
+const LIB={d:null,busy:false,err:''};
+async function libLoad(){if(LIB.d||LIB.busy)return;LIB.busy=true;try{const r=await fetch('mufredat.json',{cache:'no-cache'});if(!r.ok)throw new Error(r.status);LIB.d=await r.json();LIB.err=''}catch(e){LIB.err='Hazır müfredat listesi yüklenemedi; internet bağlantını kontrol edip sayfayı yenile.'}LIB.busy=false;if(S.ui.view==='mufredat')render()}
+function libBuild(key){const D=LIB.d;if(!D)return null;const [k,id]=key.split(':');
+  if(k==='g'){const g=D.g.find(x=>x.id===id);if(!g)return null;
+    return {id:uid(),lib:key,name:g.name+' MEB',exam:'Okul',grade:g.grade,wrongRatio:0,options:4,subjects:g.s.map(([name,units])=>({id:uid(),name,count:10,topics:units.flatMap(([un,h,ts])=>ts.map(t=>({id:uid(),name:t,unit:un,w:h?Math.round(h/ts.length*10)/10:1})))}))}}
+  const e=D.e.find(x=>x.id===id);if(!e)return null;
+  return {id:uid(),lib:key,name:e.name,exam:e.name.split(' ')[0].replace('YKS-',''),grade:e.grade,wrongRatio:e.wr,options:e.op,subjects:e.s.map(([name,q,ts])=>({id:uid(),name,count:q,topics:ts.map(([t,w])=>({id:uid(),name:t,w}))}))}}
+function libCard(){if(VIEW)return '';if(!LIB.d&&!LIB.busy&&!LIB.err)libLoad();const D=LIB.d;
+  return `<section class="card"><div class="card-h"><h2>Hazır müfredat ekle</h2><small>MEB ${D?esc(D.v):'2026-2027'} programları ve sınav konuları</small></div>
+  ${LIB.err?`<p class="note">${esc(LIB.err)}</p>`:!D?'<p class="empty">Liste yükleniyor…</p>':`<div class="row"><label class="f grow"><span>Müfredat</span><select id="lib-key">
+    <optgroup label="Sınıf müfredatları (MEB)">${D.g.map(g=>`<option value="g:${g.id}">${esc(g.name)}</option>`).join('')}</optgroup>
+    <optgroup label="Sınav müfredatları">${D.e.map(e=>`<option value="e:${e.id}">${esc(e.name)}</option>`).join('')}</optgroup></select></label>
+    <button class="btn primary" data-a="libAdd">Ekle</button></div>
+    <small class="muted">Konular ünite sırasıyla ve süreleriyle (ders saati ya da sınav ağırlığı) eklenir; otomatik plan bu sürelere göre yapılır. Eklendikten sonra ders ve konuları istediğin gibi düzenleyebilir, öğrenciye Öğrenciler sayfasından atayabilirsin. AYT'de tüm alanların dersleri gelir; öğrencinin alanı dışındakileri silebilirsin.</small>`}
+  </section>`}
+
+/* ---------- otomatik plan ---------- */
+function autoCard(s){if(VIEW||S.stuMode||PARENT)return '';const ids=(s.curIds||[s.curId]).filter(i=>curById(i)),c=curOf(s),cm=curMon();
+  const st0=s.startDate>cm?s.startDate:cm;
+  return `<section class="card"><div class="card-h"><h2>Otomatik plan oluştur</h2><small>Konular, sürelerine göre iki tarih arasındaki haftalara dağıtılır; sonra elle düzeltebilirsin</small></div>
+  <div class="row">
+    ${ids.length>1?`<label class="f"><span>Müfredat</span><select data-c="activeCur" aria-label="Müfredat">${ids.map(i=>curById(i)).map(x=>`<option value="${x.id}" ${x.id===c.id?'selected':''}>${esc(x.name)}</option>`).join('')}</select></label>`:`<div class="f"><span>Müfredat</span><b style="padding:8px 0">${esc(c.name)}</b></div>`}
+    <label class="f"><span>Başlangıç</span><input type="date" id="ap-a" value="${esc(st0)}"></label>
+    <label class="f"><span>Bitiş</span><input type="date" id="ap-b" value="${esc(s.examDate)}"></label>
+    <label class="f"><span>Sondaki tekrar haftası</span><input type="number" id="ap-r" min="0" max="12" value="${s.reviewWeeks??2}" style="width:90px"></label>
+  </div>
+  <div class="f"><span>Dersler</span><div class="srcs" id="ap-s">${c.subjects.map(sb=>`<label class="tkt"><input type="checkbox" value="${sb.id}" checked>${esc(sb.name)}</label>`).join('')}</div></div>
+  <div class="row" style="align-items:center">
+    <label class="tkt"><input type="checkbox" id="ap-skip" checked>İşlenmiş ve geçmiş haftalarda işaretli konuları atla</label>
+    <label class="f"><span>Mevcut plan</span><select id="ap-m"><option value="replace">Bu derslerin başlangıçtan sonraki planını yeniden oluştur</option><option value="add">Koru; yalnızca plana yerleştirilmemiş konuları ekle</option></select></label>
+    <button class="btn primary" data-a="autoPlan">Planı oluştur</button></div>
+  </section>`}
+function autoPlanRun(s,cur,a,b,subs,rv,skip,mode){const W=plan(s.id).weeks,p=prog(s.id);
+  const weeks=[];for(let d=mondayOf(parse(a));d<=mondayOf(parse(b))&&weeks.length<120;d=addDays(d,7))weeks.push(iso(d));
+  if(!weeks.length)return 0;const k0=weeks[0];
+  const R=weeks.length>=rv+4?rv:0,N=weeks.length-R;
+  const tids=new Set(cur.subjects.filter(sb=>subs.includes(sb.id)).flatMap(sb=>sb.topics.map(t=>t.id)));
+  if(mode==='replace')Object.keys(W).forEach(k=>{if(k>=k0){W[k]=W[k].filter(i=>!(i.topic&&tids.has(i.topic))&&!(i.auto&&i.cur===cur.id));if(!W[k].length)delete W[k]}});
+  const placed=new Set(Object.values(W).flat().map(i=>i.topic).filter(Boolean));let n=0;
+  cur.subjects.filter(sb=>subs.includes(sb.id)).forEach(sb=>{
+    const ts=sb.topics.filter(t=>!(skip&&(p[t.id]?.status==='done'||pastWeeksOf(s,t.id).length))&&!(mode==='add'&&placed.has(t.id)));
+    const tot=ts.reduce((x,t)=>x+(+t.w||1),0);let cum=0;
+    ts.forEach(t=>{const w=+t.w||1,i0=Math.min(N-1,Math.floor(cum/tot*N+1e-9)),i1=Math.max(i0,Math.min(N-1,Math.ceil((cum+w)/tot*N-1e-9)-1));cum+=w;
+      for(let i=i0;i<=i1;i++){const arr=W[weeks[i]]||(W[weeks[i]]=[]);if(!arr.some(x=>x.topic===t.id)){arr.push({id:uid(),subj:sb.id,topic:t.id,name:'',cur:cur.id});n++}}})});
+  for(let i=N;i<weeks.length;i++){const arr=W[weeks[i]]||(W[weeks[i]]=[]);if(!arr.some(x=>x.auto&&x.cur===cur.id))arr.push({id:uid(),subj:null,topic:null,name:'Genel tekrar ve deneme',cur:cur.id,auto:true})}
+  return n}
+
 /* ---------- telefon: uygulama görünümü ---------- */
 const MQ=matchMedia('(max-width:760px)');let MOB=MQ.matches,MOBINIT=false;
 const IC={ana:'M3 11l9-8 9 8v10h-6v-6H9v6H3z',ozet:'M3 13h8V3H3zM13 21h8V11h-8zM3 21h8v-6H3zM13 3v6h8V3z',program:'M3 5h18v16H3zM3 9h18M8 3v4M16 3v4',plan:'M10 6h11M10 12h11M10 18h11M3 6l1.5 1.5L7 5M3 12l1.5 1.5L7 11M3 18l1.5 1.5L7 17',dagilim:'M12 3v9h9A9 9 0 1 1 12 3zM15 3.5A9 9 0 0 1 20.5 9H15z',konular:'M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2zM4 21V5M9 8h6',matris:'M3 3h18v18H3zM3 9h18M3 15h18M9 3v18M15 3v18',kitaplar:'M14 3H6v18h12V7zM14 3v4h4M9 13h6M9 17h6',sorular:'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17h.01',denemeler:'M9 3h6v3H9zM7 5H5v16h14V5h-2M9 14l2 2 4-4',cikmis:'M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l3 2',rapor:'M4 4h16v12H8l-4 4zM8 9h8M8 12h5',veli:'M4 4h16v12H8l-4 4zM8 9h8M8 12h5',dersler:'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 3',ucretler:'M3 7h18v13H3zM3 7l3-4h12l3 4M16 13h2',ogrenciler:'M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21v-1a6 6 0 0 1 12 0v1M16 3.5a4 4 0 0 1 0 7M22 21v-1a6 6 0 0 0-4-5.6',mufredat:'M12 3l9 5-9 5-9-5zM3 12l9 5 9-5M3 16l9 5 9-5',yedek:'M7 18a5 5 0 1 1 .9-9.9A6 6 0 0 1 19 10a4 4 0 0 1-1 8M12 12v8M9 15l3-3 3 3',yonetici:'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z',back:'M15 5l-7 7 7 7',out:'M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10'};
@@ -1188,10 +1238,10 @@ window.addEventListener('popstate',()=>{if(!MOB)return;
     if(S.ui.view!=='ana')history.pushState({k:'page'},'');return}
   if(S.ui.examId){S.ui.examId=null;S.ui.examMode=null;history.pushState({k:'page'},'');render();return}
   if(S.ui.view!=='ana'){S.ui.view='ana';render();window.scrollTo(0,0)}});
-MQ.addEventListener('change',e=>{MOB=e.matches;if(!MOB&&S&&S.ui.view==='ana')S.ui.view=PARENT?'veli':S.stuMode?'matris':'ozet';if(S&&!document.getElementById('app').hidden)render()});
+MQ.addEventListener('change',e=>{MOB=e.matches;if(S&&S.ui)MOBINIT=true;if(!MOB&&S&&S.ui.view==='ana')S.ui.view=PARENT?'veli':S.stuMode?'matris':'ozet';if(S&&!document.getElementById('app').hidden)render()});
 
 const NAV=[['ozet','Özet'],['program','Haftalık program'],['plan','Konu planı'],['dagilim','Konu dağılımı'],['konular','Konu ve kaynak'],['matris','Kaynak takibi'],['kitaplar','PDF kitaplar'],['sorular','Soru takibi'],['denemeler','Denemeler'],['cikmis','Çıkmış sorular'],['rapor','Veli raporu'],['dersler','Ders programım'],['ucretler','Alacak / verecek'],['ogrenciler','Öğrenciler'],['mufredat','Müfredat'],['yedek','Yedek']];
-const STU_VIEWS=['program','dagilim','matris','denemeler','kitaplar'],STU_DENY=new Set(['resetExam','del','mxMinus','mxClear','pastRm','clearPlan','resetAll','restore']),STU_COACH=new Set(['optPause','openPlan','copyWeek','newExam','setKey','pasteKey','bulkTopic','addSec']);
+const STU_VIEWS=['program','dagilim','matris','denemeler','kitaplar'],STU_DENY=new Set(['resetExam','del','mxMinus','mxClear','pastRm','clearPlan','resetAll','restore']),STU_COACH=new Set(['libAdd','autoPlan','optPause','openPlan','copyWeek','newExam','setKey','pasteKey','bulkTopic','addSec']);
 function render(){
   if(MOB&&!MOBINIT){MOBINIT=true;S.ui.view='ana';S.ui.examId=null}if(!MOB&&S.ui.view==='ana')S.ui.view=PARENT?'veli':S.stuMode?'matris':'ozet';
   document.body.classList.toggle('mob',MOB);
@@ -1232,6 +1282,15 @@ function closeOptik(){pvClose();accrue();clearInterval(openOptik.iv);OPT=null;ov
 
 /* ---------- eylemler ---------- */
 const A={
+  libAdd:()=>{const key=val('lib-key'),c=libBuild(key);if(!c){toast('Müfredatı seç');return}
+    const ex=S.curricula.find(x=>x.lib===key);const go=()=>{S.curricula.push(c);S.ui.curId=c.id;S.ui.openSec=null;commit(`${c.name} eklendi · ${c.subjects.length} ders, ${c.subjects.reduce((a,x)=>a+x.topics.length,0)} konu`)};
+    if(ex)ask('Zaten var',`“${ex.name}” daha önce eklenmiş. Yeni bir kopyası eklensin mi? Var olan ve öğrencilere atanmış müfredat değişmez.`,go);else go()},
+  autoPlan:()=>{const s=st();if(!s)return;const cur=curOf(s),a=val('ap-a'),b=val('ap-b'),rv=Math.max(0,Math.min(12,Math.floor(+val('ap-r')||0))),mode=val('ap-m'),skip=document.getElementById('ap-skip').checked;
+    const subs=[...document.querySelectorAll('#ap-s input:checked')].map(x=>x.value);
+    if(!a||!b||b<a){toast('Başlangıç ve bitiş tarihini kontrol et');return}if(!subs.length){toast('En az bir ders seç');return}
+    const wk=Math.round((mondayOf(parse(b))-mondayOf(parse(a)))/(7*864e5))+1;
+    ask('Plan oluşturulsun mu?',`${cur.name} · ${subs.length} ders, ${fmt(a)} – ${fmt(b)} arası ${wk} hafta${rv&&wk>=rv+4?`, son ${rv} hafta genel tekrar`:''}. ${mode==='replace'?'Bu derslerin başlangıç tarihinden sonraki mevcut planı silinip yeniden oluşturulacak; geçmiş haftalara dokunulmaz.':'Mevcut plan korunur, yalnızca yerleştirilmemiş konular eklenir.'}`,()=>{
+      const n=autoPlanRun(s,cur,a,b,subs,rv,skip,mode);s.planEdited=true;OPENW.clear();OPENW.add(curMon());commit(n?`Plan oluşturuldu · ${n} konu-hafta yerleştirildi`:'Yerleştirilecek konu bulunamadı')})},
   home:()=>{if(MOB&&history.state&&history.state.k==='page'){history.back();return}S.ui.view='ana';S.ui.examId=null;commit();window.scrollTo(0,0)},
   go:el=>{mobNav(el.dataset.v);S.ui.view=el.dataset.v;if(el.dataset.v==='denemeler'){S.ui.examId=null}commit();window.scrollTo(0,0)},
   week:el=>{const d=+el.dataset.d;S.ui.week=d===0?0:S.ui.week+d;commit()},
