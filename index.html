@@ -1171,6 +1171,7 @@ VIEWS.kitaplar=()=>{
 
 VIEWS.yedek=()=>`${head('Yedek ve veriler')}
   ${rescueCard()}
+  ${histCard()}
   <div class="grid2">
   <section class="card"><h2>Veriler nerede?</h2><p>Kayıtların hesabına bağlı olarak sunucuda saklanıyor; hangi cihazdan giriş yaparsan yap aynı kayıtları görürsün. Yine de ara ara yedek almak iyi bir alışkanlık. Öğrenci ve veli girişi bir sonraki aşamada eklenecek.</p>
     <p class="note">Örnek öğrenciler ve denemeler, uygulamayı denemen için eklendi. Kendi öğrencilerini girdikten sonra onları Öğrenciler sayfasından silebilirsin.</p></section>
@@ -1263,7 +1264,7 @@ window.addEventListener('popstate',()=>{if(!MOB)return;
 MQ.addEventListener('change',e=>{MOB=IN_APP||e.matches;if(S&&S.ui)MOBINIT=true;if(!MOB&&S&&S.ui.view==='ana')S.ui.view=PARENT?'veli':S.stuMode?'matris':'ozet';if(S&&!document.getElementById('app').hidden)render()});
 
 const NAV=[['ozet','Özet'],['program','Haftalık program'],['plan','Konu planı'],['dagilim','Konu dağılımı'],['konular','Konu ve kaynak'],['matris','Kaynak takibi'],['kitaplar','PDF kitaplar'],['sorular','Soru takibi'],['denemeler','Denemeler'],['cikmis','Çıkmış sorular'],['rapor','Veli raporu'],['dersler','Ders programım'],['ucretler','Alacak / verecek'],['ogrenciler','Öğrenciler'],['mufredat','Müfredat'],['yedek','Yedek']];
-const STU_VIEWS=['program','dagilim','matris','denemeler','kitaplar'],STU_DENY=new Set(['resetExam','del','mxMinus','mxClear','pastRm','clearPlan','resetAll','restore']),STU_COACH=new Set(['rescueApply','rescueDrop','g4Fix','libAdd','autoPlan','optPause','openPlan','copyWeek','newExam','setKey','pasteKey','bulkTopic','addSec']);
+const STU_VIEWS=['program','dagilim','matris','denemeler','kitaplar'],STU_DENY=new Set(['resetExam','del','mxMinus','mxClear','pastRm','clearPlan','resetAll','restore']),STU_COACH=new Set(['histLoad','histRestore','admDownload','rescueApply','rescueDrop','g4Fix','libAdd','autoPlan','optPause','openPlan','copyWeek','newExam','setKey','pasteKey','bulkTopic','addSec']);
 function render(){
   if(MOB&&!MOBINIT){MOBINIT=true;S.ui.view='ana';S.ui.examId=null}if(!MOB&&S.ui.view==='ana')S.ui.view=PARENT?'veli':S.stuMode?'matris':'ozet';
   document.body.classList.toggle('mob',MOB);
@@ -1275,7 +1276,7 @@ function render(){
     <nav class="nav">${(PARENT?PARENT_NAV:S.stuMode?NAV.filter(([v])=>STU_VIEWS.includes(v)):ME?.role==='admin'?[...NAV,['yonetici','Yönetici']]:NAV).map(([v,l])=>`<button class="${S.ui.view===v?'on':''}" data-a="go" data-v="${v}">${l}</button>`).join('')}</nav>
     <p class="side-foot">${STUDENT?`<span id="sync">${stuSyncText()}</span><br>Koç: ${esc(STUDENT.coach)}`:PARENT?`Koç: ${esc(PARENT.coach)}<br>Yalnızca görüntüleme`:`<span id="sync">${syncText()}</span><br>${esc(ME?.email||'')}`}</p>`;
   if(S.ui.view==='yonetici'&&ME?.role!=='admin')S.ui.view='ozet';
-  document.getElementById('main').innerHTML=(VIEW?`<div class="banner" role="status"><span><b>${esc(VIEW.name)}</b> adlı koçun kayıtlarını görüntülüyorsun. Burada yaptığın değişiklikler kaydedilmez; yalnızca “Alacak / verecek” sayfasındaki saatlik ve aylık ücretleri değiştirebilirsin.</span><button class="btn sm primary" data-a="viewExit">Kendi panelime dön</button></div>`:'')+(VIEWS[S.ui.view]||VIEWS.ozet)();
+  document.getElementById('main').innerHTML=(VIEW?`<div class="banner" role="status"><span><b>${esc(VIEW.name)}</b> adlı koçun kayıtlarını görüntülüyorsun. Burada yaptığın değişiklikler kaydedilmez; yalnızca “Alacak / verecek” sayfasındaki ücretleri değiştirebilir, “Yedek” sayfasından eski bir sürümü geri yükleyebilirsin.</span><button class="btn sm primary" data-a="viewExit">Kendi panelime dön</button></div>`:'')+(VIEWS[S.ui.view]||VIEWS.ozet)();
 }
 function commit(msg){save();render();if(msg)toast(msg)}
 const val=id=>document.getElementById(id)?.value??'';
@@ -1304,6 +1305,9 @@ function closeOptik(){pvClose();accrue();clearInterval(openOptik.iv);OPT=null;ov
 
 /* ---------- eylemler ---------- */
 const A={
+  histLoad:()=>{HIST.rows=null;histLoad();render()},
+  histRestore:el=>{const h=(HIST.rows||[]).find(x=>String(x.id)===el.dataset.id);if(!h)return;ask('Bu sürüm geri yüklensin mi?',`Kayıtlar ${new Date(h.saved_at||h.archived_at).toLocaleString('tr-TR')} tarihindeki hâline döner (${h.students} öğrenci, ${h.tasks} görev, ${h.exams} deneme). Şu anki hâl önce geçmişe kaydedilir; istersen bunu da geri alabilirsin.`,()=>histRestore(h.id))},
+  admDownload:()=>admDownload(),
   rescueApply:()=>{const r=rescueGet(),P=rescuePlan(r);if(!P||!P.n)return;ask('Eksikler geri getirilsin mi?',`${P.n} kayıt bu cihazdaki eski kopyadan eklenecek. Mevcut kayıtların değişmez.`,()=>{
       P.tasks.forEach(t=>S.tasks.push(t));P.done.forEach(id=>{const q=S.tasks.find(x=>x.id===id);if(q)q.done=true});
       P.exams.forEach(e=>{const k=S.exams.findIndex(x=>x.id===e.id);if(k>=0)S.exams[k]=e;else S.exams.push(e)});
@@ -1608,6 +1612,26 @@ function merge3(b,l,s){
       if(sk===undefined){if(!(bk!==undefined&&JS(lk)===JS(bk)))o[k]=lk;return}
       o[k]=merge3(bk,lk,sk)});return o}
   return b===undefined?s:l}
+const HIST={who:null,rows:null,busy:false,off:false};
+async function histLoad(){const who=VIEW?VIEW.id:AUTHU&&AUTHU.id;if(!SB||!who)return;HIST.busy=true;HIST.who=who;
+  try{const r=await SB.from('coach_state_history').select('id,saved_at,archived_at,reason,students,tasks,exams').eq('coach_id',who).order('archived_at',{ascending:false}).limit(60);if(r.error)throw r.error;HIST.rows=r.data||[];HIST.off=false}
+  catch(e){HIST.rows=[];HIST.off=true}HIST.busy=false;if(S.ui.view==='yedek')render()}
+function histCard(){if(!SB||S.stuMode||PARENT||!AUTHU)return '';const who=VIEW?VIEW.id:AUTHU.id;if(HIST.who!==who){HIST.rows=null;HIST.who=who}if(HIST.rows===null&&!HIST.busy)histLoad();
+  const why={update:'Otomatik',shrink:'Kayıt azalmadan önce',restore:'Geri yükleme öncesi',delete:'Silme öncesi'};
+  const dt=x=>x?new Date(x).toLocaleString('tr-TR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'—';
+  return `<section class="card"><div class="card-h"><h2>Sunucudaki geçmiş sürümler</h2><button class="btn sm" data-a="histLoad">Yenile</button></div>
+  ${HIST.off?'<p class="note">Sürüm geçmişi için <b>supabase/06_surum_gecmisi.sql</b> dosyasını Supabase’de bir kez çalıştırman gerekiyor.</p>':HIST.rows===null?'<p class="empty">Yükleniyor…</p>':!HIST.rows.length?'<p class="empty">Henüz geçmiş sürüm yok. Kayıtlar değiştikçe en fazla 10 dakikada bir, kayıt azaldığında ise her seferinde eski hâl saklanır.</p>':`
+  <p class="muted">Kayıtlar her değiştiğinde eski hâli 90 gün saklanır. Geri yüklediğinde şu anki hâl de önce buraya kaydedilir; yani geri yükleme de geri alınabilir.</p>
+  <div class="tw"><table class="t"><thead><tr><th>Sürümün tarihi</th><th>Neden saklandı</th><th class="r">Öğrenci</th><th class="r">Görev</th><th class="r">Deneme</th><th></th></tr></thead><tbody>
+  ${HIST.rows.map(h=>`<tr><td class="num" style="white-space:nowrap">${dt(h.saved_at||h.archived_at)}</td><td>${why[h.reason]||h.reason}</td><td class="r num">${h.students}</td><td class="r num">${h.tasks}</td><td class="r num">${h.exams}</td><td><button class="btn sm" data-a="histRestore" data-id="${h.id}">Geri yükle</button></td></tr>`).join('')}
+  </tbody></table></div>`}</section>`}
+async function histRestore(id){try{const r=await SB.rpc('restore_coach_state',{p_id:id});if(r.error)throw r.error;
+    if(VIEW){const q=await SB.from('coach_state').select('data').eq('coach_id',VIEW.id).maybeSingle();if(q.data&&q.data.data){init(q.data.data);S.stuMode=false;S.ui.view='yedek'}}
+    else{const q=await SB.from('coach_state').select('data,updated_at').eq('coach_id',AUTHU.id).maybeSingle();if(q.data){const ui=S.ui;CLOUD.dirty=false;clearTimeout(CLOUD.timer);CLOUD.at=q.data.updated_at;setBase(AUTHU.id,q.data.data);init(q.data.data);S.ui=ui;try{localStorage.setItem(KEY+':'+AUTHU.id,JS(S));localStorage.removeItem(KEY+':pending:'+AUTHU.id)}catch(e){}}}
+    HIST.rows=null;render();toast('Sürüm geri yüklendi')}catch(e){toast(aerr(e))}}
+async function admDownload(){try{const [a,b]=await Promise.all([SB.from('profiles').select('*'),SB.from('coach_state').select('coach_id,data,updated_at')]);if(a.error||b.error)throw a.error||b.error;
+  const out={alindi:new Date().toISOString(),profiller:a.data,koc_kayitlari:b.data};const blob=new Blob([JSON.stringify(out)],{type:'application/json'});const u=URL.createObjectURL(blob),x=document.createElement('a');
+  x.href=u;x.download='k-kocluk-tum-yedek-'+iso(today())+'.json';document.body.appendChild(x);x.click();x.remove();setTimeout(()=>URL.revokeObjectURL(u),4000);toast(`${b.data.length} koçun kayıtları indirildi`)}catch(e){toast(aerr(e))}}
 function rescueGet(){if(!AUTHU)return null;try{const x=localStorage.getItem(KEY+':rescue:'+AUTHU.id);return x?JSON.parse(x):null}catch(e){return null}}
 function rescuePlan(r){if(!r||r.v!==1)return null;const P={tasks:[],done:[],exams:[],mx:[]};
   (r.tasks||[]).forEach(t=>{const q=S.tasks.find(x=>x.id===t.id);if(!q){if(S.students.some(x=>x.id===t.sid))P.tasks.push(t)}else if(t.done&&!q.done)P.done.push(t.id)});
@@ -1905,7 +1929,7 @@ VIEWS.yonetici=()=>{
   const rows=ADM.rows,wait=rows.filter(r=>accessOf(r)==='pending').length;
   const pill=r=>{const a=accessOf(r);return r.role==='admin'?'<span class="pill mut">Yönetici</span>':a==='pending'?'<span class="pill warn">Onay bekliyor</span>':a==='frozen'?'<span class="pill bad">Donduruldu</span>':a==='expired'?'<span class="pill bad">Süresi doldu</span>':'<span class="pill ok">Aktif</span>'};
   const dt=x=>x?new Date(x).toLocaleDateString('tr-TR',{day:'numeric',month:'short',year:'numeric'}):'—';
-  return `${head('Yönetici',`<span class="pill mut">${rows.filter(r=>r.role!=='admin').length} koç</span>${wait?`<span class="pill warn">${wait} onay bekliyor</span>`:''}<button class="btn sm" data-a="admLoad">Yenile</button>`)}
+  return `${head('Yönetici',`<span class="pill mut">${rows.filter(r=>r.role!=='admin').length} koç</span>${wait?`<span class="pill warn">${wait} onay bekliyor</span>`:''}<button class="btn sm" data-a="admDownload">Tüm sistemi yedekle (indir)</button><button class="btn sm" data-a="admLoad">Yenile</button>`)}
   ${ADM.err?`<p class="note" role="alert">${esc(ADM.err)}</p>`:''}
   <section class="card"><div class="card-h"><h2>Nasıl çalışır</h2></div><p class="muted">Yeni kaydolan koç “Onay bekliyor” olarak görünür; onaylayınca uygulamayı kullanmaya başlar. Her ay, koçun o andaki öğrenci sayısı × öğrenci başı bedel kadar borç yazılır; aldığın parayı “Ödeme al” ile girersin. Ödemeyen koçu dondurabilirsin: erişimi hemen kapanır, kayıtları silinmez. Kalıcı silme geri alınamaz.</p></section>
   ${ADM.billOff?'<p class="note">Öğrenci başı aylık bedel için <b>supabase/05_ogrenci_basi_bedel.sql</b> dosyasını Supabase’de bir kez çalıştırman gerekiyor.</p>':(()=>{const cs=rows.filter(r=>r.role!=='admin'),tb=cs.map(r=>admBal(r.id)),ym=todayIso().slice(0,7),est=cs.filter(r=>accessOf(r)==='ok').reduce((a,r)=>a+admPriceOf(r)*(r._n||0),0);
