@@ -1170,6 +1170,7 @@ VIEWS.kitaplar=()=>{
 };
 
 VIEWS.yedek=()=>`${head('Yedek ve veriler')}
+  ${rescueCard()}
   <div class="grid2">
   <section class="card"><h2>Veriler nerede?</h2><p>Kayıtların hesabına bağlı olarak sunucuda saklanıyor; hangi cihazdan giriş yaparsan yap aynı kayıtları görürsün. Yine de ara ara yedek almak iyi bir alışkanlık. Öğrenci ve veli girişi bir sonraki aşamada eklenecek.</p>
     <p class="note">Örnek öğrenciler ve denemeler, uygulamayı denemen için eklendi. Kendi öğrencilerini girdikten sonra onları Öğrenciler sayfasından silebilirsin.</p></section>
@@ -1262,7 +1263,7 @@ window.addEventListener('popstate',()=>{if(!MOB)return;
 MQ.addEventListener('change',e=>{MOB=IN_APP||e.matches;if(S&&S.ui)MOBINIT=true;if(!MOB&&S&&S.ui.view==='ana')S.ui.view=PARENT?'veli':S.stuMode?'matris':'ozet';if(S&&!document.getElementById('app').hidden)render()});
 
 const NAV=[['ozet','Özet'],['program','Haftalık program'],['plan','Konu planı'],['dagilim','Konu dağılımı'],['konular','Konu ve kaynak'],['matris','Kaynak takibi'],['kitaplar','PDF kitaplar'],['sorular','Soru takibi'],['denemeler','Denemeler'],['cikmis','Çıkmış sorular'],['rapor','Veli raporu'],['dersler','Ders programım'],['ucretler','Alacak / verecek'],['ogrenciler','Öğrenciler'],['mufredat','Müfredat'],['yedek','Yedek']];
-const STU_VIEWS=['program','dagilim','matris','denemeler','kitaplar'],STU_DENY=new Set(['resetExam','del','mxMinus','mxClear','pastRm','clearPlan','resetAll','restore']),STU_COACH=new Set(['g4Fix','libAdd','autoPlan','optPause','openPlan','copyWeek','newExam','setKey','pasteKey','bulkTopic','addSec']);
+const STU_VIEWS=['program','dagilim','matris','denemeler','kitaplar'],STU_DENY=new Set(['resetExam','del','mxMinus','mxClear','pastRm','clearPlan','resetAll','restore']),STU_COACH=new Set(['rescueApply','rescueDrop','g4Fix','libAdd','autoPlan','optPause','openPlan','copyWeek','newExam','setKey','pasteKey','bulkTopic','addSec']);
 function render(){
   if(MOB&&!MOBINIT){MOBINIT=true;S.ui.view='ana';S.ui.examId=null}if(!MOB&&S.ui.view==='ana')S.ui.view=PARENT?'veli':S.stuMode?'matris':'ozet';
   document.body.classList.toggle('mob',MOB);
@@ -1303,6 +1304,13 @@ function closeOptik(){pvClose();accrue();clearInterval(openOptik.iv);OPT=null;ov
 
 /* ---------- eylemler ---------- */
 const A={
+  rescueApply:()=>{const r=rescueGet(),P=rescuePlan(r);if(!P||!P.n)return;ask('Eksikler geri getirilsin mi?',`${P.n} kayıt bu cihazdaki eski kopyadan eklenecek. Mevcut kayıtların değişmez.`,()=>{
+      P.tasks.forEach(t=>S.tasks.push(t));P.done.forEach(id=>{const q=S.tasks.find(x=>x.id===id);if(q)q.done=true});
+      P.exams.forEach(e=>{const k=S.exams.findIndex(x=>x.id===e.id);if(k>=0)S.exams[k]=e;else S.exams.push(e)});
+      P.mx.forEach(([rs])=>{const s=S.students.find(x=>x.id===rs.id),M=mxOf(s);(rs.mx.cols||[]).forEach(c=>{if(!M.cols.some(x=>x.id===c.id))M.cols.push(c)});
+        Object.keys(rs.mx.cells||{}).forEach(t=>Object.keys(rs.mx.cells[t]||{}).forEach(c=>{const src=rs.mx.cells[t][c]||[],row=(M.cells[t]||(M.cells[t]={})),dst=row[c]||(row[c]=[]);src.forEach((x,i)=>{if(x&&x.done&&!(dst[i]&&dst[i].done)){while(dst.length<=i)dst.push({});dst[i]=x}})}))});
+      try{localStorage.removeItem(KEY+':rescue:'+AUTHU.id)}catch(e){}commit('Eksik kayıtlar geri getirildi')})},
+  rescueDrop:()=>{ask('Gizlensin mi?','Bu cihazdaki eski kopya silinecek ve bu uyarı bir daha görünmeyecek.',()=>{try{localStorage.removeItem(KEY+':rescue:'+AUTHU.id)}catch(e){}render()})},
   g4Fix:el=>{const c=curById(el.dataset.id);if(!g4Old(c))return;const sb=c.subjects.find(x=>x.name==='Türkçe'),ids=new Set(sb.topics.map(t=>t.id));
     const pl=Object.values(S.plans).reduce((a,P)=>a+Object.values(P.weeks||{}).flat().filter(i=>ids.has(i.topic)).length,0),tk=S.tasks.filter(t=>ids.has(t.topic)).length;
     ask('Türkçe konuları güncellensin mi?',`${sb.topics.length} eski başlık kaldırılıp ${G4TR.reduce((a,u)=>a+u[2].length,0)} konu eklenecek.${pl?` Konu planındaki bu başlıklara ait ${pl} kayıt silinecek; planı Konu planı sayfasındaki “Otomatik plan oluştur” ile yalnızca Türkçe seçip yeniden oluşturabilirsin.`:''}${tk?` Haftalık programdaki ${tk} görev silinmez; konusu “Diğer” olarak eski adıyla kalır, istersen düzenlersin.`:''}`,()=>{
@@ -1577,26 +1585,64 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!document.getElemen
 /* ---------- bulut: hesap, onay, eşitleme ---------- */
 const SB_URL='https://hujycplpqjwuwdhmrxqt.supabase.co',SB_KEY='sb_publishable_NrDTSYZUNHH539yCD7t2sg_a2td_RDF';
 let SB=null,AUTHU=null,ME=null,VIEW=null,MYS=null,GATE={mode:'loading',msg:'',err:''};
-const CLOUD={dirty:false,saving:false,timer:null,err:'',at:null};
+const CLOUD={dirty:false,saving:false,timer:null,err:'',at:null,base:null};
 const ADM={rows:null,err:'',busy:false};
 const todayIso=()=>iso(today());
 function accessOf(p){if(!p)return 'noprofile';if(p.role==='admin'&&p.approved)return 'ok';if(!p.approved)return 'pending';if(p.frozen)return 'frozen';if(p.paid_until&&p.paid_until<todayIso())return 'expired';return 'ok'}
 function syncText(){return VIEW?'Salt okunur görünüm':CLOUD.saving?'Kaydediliyor…':CLOUD.err?'Kaydedilemedi, yeniden denenecek':CLOUD.dirty?'Kaydedilecek…':'Tüm değişiklikler kaydedildi'}
 function syncLabel(){const e=document.getElementById('sync');if(e)e.textContent=syncText()}
 function cloudDirty(){CLOUD.dirty=true;clearTimeout(CLOUD.timer);CLOUD.timer=setTimeout(cloudSave,1500);syncLabel()}
+/* üç yollu birleştirme: aynı hesap birden fazla cihazda açıkken kimsenin kaydı ezilmesin */
+const isO=x=>!!x&&typeof x==='object'&&!Array.isArray(x),JS=x=>JSON.stringify(x);
+const idArr=a=>Array.isArray(a)&&a.every(x=>isO(x)&&typeof x.id==='string');
+function merge3(b,l,s){
+  if(l===undefined)return s;if(s===undefined)return l;
+  const jl=JS(l),js=JS(s);if(jl===js)return s;
+  if(b!==undefined){const jb=JS(b);if(jl===jb)return s;if(js===jb)return l}
+  if(idArr(l)&&idArr(s)){const bm=new Map((Array.isArray(b)?b:[]).filter(isO).map(x=>[x.id,x])),lm=new Map(l.map(x=>[x.id,x])),sm=new Map(s.map(x=>[x.id,x])),out=[];
+    s.forEach(x=>{if(lm.has(x.id))out.push(merge3(bm.get(x.id),lm.get(x.id),x));else if(!(bm.has(x.id)&&JS(bm.get(x.id))===JS(x)))out.push(x)});
+    l.forEach(x=>{if(!sm.has(x.id)&&!(bm.has(x.id)&&JS(bm.get(x.id))===JS(x)))out.push(x)});return out}
+  if(Array.isArray(l)&&Array.isArray(s)&&l.length===s.length&&l.every(isO)&&s.every(isO))return l.map((x,i)=>merge3(Array.isArray(b)?b[i]:undefined,x,s[i]));
+  if(isO(l)&&isO(s)){const o={},bb=isO(b)?b:undefined;new Set([...Object.keys(s),...Object.keys(l)]).forEach(k=>{const bk=bb?bb[k]:undefined,lk=l[k],sk=s[k];
+      if(lk===undefined){if(!(bk!==undefined&&JS(sk)===JS(bk)))o[k]=sk;return}
+      if(sk===undefined){if(!(bk!==undefined&&JS(lk)===JS(bk)))o[k]=lk;return}
+      o[k]=merge3(bk,lk,sk)});return o}
+  return b===undefined?s:l}
+function rescueGet(){if(!AUTHU)return null;try{const x=localStorage.getItem(KEY+':rescue:'+AUTHU.id);return x?JSON.parse(x):null}catch(e){return null}}
+function rescuePlan(r){if(!r||r.v!==1)return null;const P={tasks:[],done:[],exams:[],mx:[]};
+  (r.tasks||[]).forEach(t=>{const q=S.tasks.find(x=>x.id===t.id);if(!q){if(S.students.some(x=>x.id===t.sid))P.tasks.push(t)}else if(t.done&&!q.done)P.done.push(t.id)});
+  (r.exams||[]).forEach(e=>{const q=S.exams.find(x=>x.id===e.id);if(!q){if(S.students.some(x=>x.id===e.sid))P.exams.push(e)}else if(e.done&&!q.done)P.exams.push(e)});
+  (r.students||[]).forEach(rs=>{const s=S.students.find(x=>x.id===rs.id);if(!s||!rs.mx)return;const a=rs.mx.cells||{},b=(s.mx||{}).cells||{};let n=0;
+    Object.keys(a).forEach(t=>Object.keys(a[t]||{}).forEach(c=>(a[t][c]||[]).forEach((x,i)=>{if(x&&x.done&&!(b[t]?.[c]?.[i]?.done))n++})));if(n)P.mx.push([rs,n])});
+  P.n=P.tasks.length+P.done.length+P.exams.length+P.mx.reduce((a,x)=>a+x[1],0);return P}
+function rescueDiff(r){const P=rescuePlan(r);return P&&{tasks:P.tasks.length,done:P.done.length,exams:P.exams.length,cells:P.mx.reduce((a,x)=>a+x[1],0),n:P.n}}
+function rescueCard(){if(VIEW||S.stuMode||PARENT)return '';const d=rescueDiff(rescueGet());if(!d||!d.n)return '';
+  return `<section class="card" style="border-color:var(--warn)"><div class="card-h"><h2>Bu cihazda eksik kayıtlar bulundu</h2></div>
+  <p>Bu cihazın hafızasındaki eski kopyada, şu an sunucuda olmayan kayıtlar var: ${[d.tasks&&d.tasks+' görev',d.done&&d.done+' tamamlanma işareti',d.cells&&d.cells+' test işareti',d.exams&&d.exams+' deneme'].filter(Boolean).join(', ')}. Bunlar büyük olasılıkla başka bir cihazdan yapılan kayıtla ezilen öğrenci çalışmaları.</p>
+  <p class="muted">Geri getirdiğinde yalnızca eksik olanlar eklenir; mevcut kayıtların değişmez. Bu arada bilerek sildiğin bir kayıt varsa o da geri gelebilir.</p>
+  <div class="row" style="gap:8px"><button class="btn primary" data-a="rescueApply">Eksikleri geri getir</button><button class="btn link" data-a="rescueDrop">Gerek yok, gizle</button></div></section>`}
+function setBase(uid,data){CLOUD.base=typeof data==='string'?data:JS(data);try{localStorage.setItem(KEY+':base:'+uid,CLOUD.base)}catch(e){}}
 async function cloudSave(){
   if(!SB||!AUTHU||VIEW||CLOUD.saving||!CLOUD.dirty)return;
-  clearTimeout(CLOUD.timer);CLOUD.saving=true;CLOUD.dirty=false;syncLabel();const uid=AUTHU.id;let error=null,data=null;
-  try{const r=await SB.from('coach_state').upsert({coach_id:uid,data:JSON.parse(JSON.stringify(S))},{onConflict:'coach_id'}).select('updated_at').single();error=r.error;data=r.data}catch(e){error=e}
+  clearTimeout(CLOUD.timer);CLOUD.saving=true;CLOUD.dirty=false;syncLabel();const uid=AUTHU.id;let error=null,data=null,merged=false;
+  try{for(let k=0;k<4;k++){const body=JSON.parse(JS(S));
+      if(CLOUD.at){const r=await SB.from('coach_state').update({data:body}).eq('coach_id',uid).eq('updated_at',CLOUD.at).select('updated_at');if(r.error)throw r.error;
+        if(r.data&&r.data.length){data=r.data[0];setBase(uid,body);break}
+        const q=await SB.from('coach_state').select('data,updated_at').eq('coach_id',uid).maybeSingle();if(q.error)throw q.error;if(!q.data){CLOUD.at=null;continue}
+        const base=CLOUD.base?JSON.parse(CLOUD.base):undefined,ui=S.ui;init(merge3(base,JSON.parse(JS(S)),q.data.data));S.ui=ui;CLOUD.at=q.data.updated_at;setBase(uid,q.data.data);merged=true}
+      else{const r=await SB.from('coach_state').upsert({coach_id:uid,data:body},{onConflict:'coach_id'}).select('updated_at').single();if(r.error)throw r.error;data=r.data;setBase(uid,body);break}}
+    if(!data)throw new Error('Kayıt çakışması çözülemedi')}catch(e){error=e}
   CLOUD.saving=false;
   if(error){const first=!CLOUD.err;CLOUD.err=String(error.message||error);CLOUD.dirty=true;clearTimeout(CLOUD.timer);CLOUD.timer=setTimeout(cloudSave,8000);if(first)toast('Kaydedilemedi; bağlantını kontrol et, yeniden denenecek')}
-  else{CLOUD.err='';CLOUD.at=data&&data.updated_at;if(!CLOUD.dirty){try{localStorage.removeItem(KEY+':pending:'+uid)}catch(e){}}else cloudDirty()}
+  else{CLOUD.err='';CLOUD.at=data.updated_at;if(!CLOUD.dirty){try{localStorage.removeItem(KEY+':pending:'+uid)}catch(e){}}else cloudDirty();
+    if(merged){try{localStorage.setItem(KEY+':'+uid,JS(S))}catch(e){}const a=document.activeElement;if(!(a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))&&document.getElementById('dlg').hidden&&!PV&&!OPT)render();toast('Başka cihazdaki değişikliklerle birleştirildi')}}
   syncLabel()}
 async function cloudRefresh(){
   if(!SB||!AUTHU||VIEW||CLOUD.dirty||CLOUD.saving||OPT||PV||!document.getElementById('dlg').hidden||!document.getElementById('gate').hidden)return;
   try{const {data:p}=await SB.from('profiles').select('*').eq('id',AUTHU.id).maybeSingle();if(p){ME=p;const a=accessOf(p);if(a!=='ok'){showGate(a);return}}
-    const {data:r}=await SB.from('coach_state').select('data,updated_at').eq('coach_id',AUTHU.id).maybeSingle();
-    if(r&&r.updated_at&&r.updated_at!==CLOUD.at&&r.data&&r.data.v===1&&!CLOUD.dirty){const ui=S.ui;CLOUD.at=r.updated_at;init(r.data);S.ui=Object.assign(S.ui,{view:ui.view,week:ui.week});render();toast('Başka cihazdaki değişiklikler alındı')}}catch(e){}
+    const {data:t}=await SB.from('coach_state').select('updated_at').eq('coach_id',AUTHU.id).maybeSingle();
+    if(t&&t.updated_at&&t.updated_at!==CLOUD.at&&!CLOUD.dirty){const {data:r}=await SB.from('coach_state').select('data,updated_at').eq('coach_id',AUTHU.id).maybeSingle();
+    if(r&&r.data&&r.data.v===1&&!CLOUD.dirty&&!CLOUD.saving){const ui=S.ui;CLOUD.at=r.updated_at;setBase(AUTHU.id,r.data);init(r.data);S.ui=Object.assign(S.ui,{view:ui.view,week:ui.week});render();toast('Başka cihazdaki değişiklikler alındı')}}}catch(e){}
   absorbOps()}
 
 /* öğrenci girişi: öğrenci kendi telefonundan yalnızca izinli kayıtları gönderir; koçun uygulaması bunları işler */
@@ -1756,9 +1802,12 @@ async function enter(user){
   try{const r=await SB.from('profiles').select('*').eq('id',user.id).maybeSingle();if(r.error)throw r.error;p=r.data}catch(e){showGate('error','',aerr(e));return}
   ME=p;const a=accessOf(p);if(a!=='ok'){showGate(a);return}
   let row=null;try{const r=await SB.from('coach_state').select('data,updated_at').eq('coach_id',user.id).maybeSingle();if(r.error)throw r.error;row=r.data}catch(e){showGate('error','',aerr(e));return}
+  try{const c=localStorage.getItem(KEY+':'+user.id);if(c&&!localStorage.getItem(KEY+':rescue:'+user.id))localStorage.setItem(KEY+':rescue:'+user.id,c)}catch(e){}
   let local=null;try{if(localStorage.getItem(KEY+':pending:'+user.id)){const o=JSON.parse(localStorage.getItem(KEY+':'+user.id));if(o&&o.v===1)local=o}}catch(e){}
   VIEW=null;MYS=null;ADM.rows=null;PL.map=null;PARENT=null;STUDENT=null;CLOUD.at=row&&row.updated_at;CLOUD.err='';CLOUD.dirty=false;
-  SA.map=null;AS=sbAssets();ASU=null;ASL=null;refreshAssets().then(()=>{if(S&&S.ui.view==='kitaplar'&&!BK.busy)render()});if(local){init(local);cloudDirty()}else if(row&&row.data&&row.data.v===1)init(row.data);else{init(seed());showApp();render();save();return}
+  SA.map=null;AS=sbAssets();ASU=null;ASL=null;refreshAssets().then(()=>{if(S&&S.ui.view==='kitaplar'&&!BK.busy)render()});let lb;try{const x=localStorage.getItem(KEY+':base:'+user.id);if(x)lb=JSON.parse(x)}catch(e){}
+  if(row&&row.data&&row.data.v===1)setBase(user.id,row.data);else CLOUD.base=null;
+  if(local&&row&&row.data&&row.data.v===1){init(merge3(lb,local,row.data));cloudDirty()}else if(local){init(local);cloudDirty()}else if(row&&row.data&&row.data.v===1)init(row.data);else{init(seed());showApp();render();save();return}
   showApp();render();absorbOps()}
 async function boot(){
   if(!window.supabase||!window.supabase.createClient){showGate('error','','Uygulamanın bir parçası yüklenemedi. Sayfayı yenile.');return}
@@ -1882,7 +1931,7 @@ VIEWS.yonetici=()=>{
       ${adm?'':`<button class="btn sm link" data-a="admDel" data-id="${r.id}">Kalıcı sil</button>`}</div></article>`}).join('')}</section>`;
 };
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){if(CLOUD.dirty)cloudSave()}else if(PARENT){if(document.getElementById('gate').hidden&&!PV)parentEnter(PARENT.tok)}else if(STUDENT)studentRefresh();else cloudRefresh()});
-setInterval(()=>{if(document.visibilityState==='visible'){if(STUDENT)studentRefresh();else absorbOps()}},45000);
+setInterval(()=>{if(document.visibilityState==='visible'){if(STUDENT)studentRefresh();else if(AUTHU&&!VIEW)cloudRefresh()}},45000);
 window.addEventListener('pagehide',()=>{if(STUDENT){if(SQ.length)stuPush()}else if(CLOUD.dirty)cloudSave()});
 const PTOK=(location.hash.match(/veli=([a-f0-9]{32,})/)||[])[1]||'';
 ASREADY=true;
