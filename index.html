@@ -278,7 +278,9 @@ body.mob .ph:not(:has(.ph-r>*)){display:none}
 .ahome .alab{font-size:11px;letter-spacing:.08em;text-transform:uppercase;opacity:.8;margin-bottom:-6px}
 .hsec{display:flex;flex-direction:column;gap:10px}
 .hsec h2{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:4px 2px 0}
-.tiles-h{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.tiles-h{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,160px),1fr));gap:10px}
+@media (max-width:420px){.tiles-h{grid-template-columns:repeat(2,minmax(0,1fr))}}
+body.mob main{max-width:1000px;margin-inline:auto;width:100%;box-sizing:border-box}
 .tl{all:unset;cursor:pointer;box-sizing:border-box;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:10px;min-height:118px;box-shadow:0 1px 2px rgba(0,0,0,.04);transition:transform .08s}
 .tl:active{transform:scale(.97);background:var(--surface-2)}
 .tl .ic{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent)}
@@ -1228,7 +1230,7 @@ function autoPlanRun(s,cur,a,b,subs,rv,skip,mode){const W=plan(s.id).weeks,p=pro
   return n}
 
 /* ---------- telefon: uygulama görünümü ---------- */
-const MQ=matchMedia('(max-width:760px)');let MOB=MQ.matches,MOBINIT=false;
+const IN_APP=/; wv\)/.test(navigator.userAgent),MQ=matchMedia('(max-width:760px), (pointer:coarse)');let MOB=IN_APP||MQ.matches,MOBINIT=false;
 const IC={ana:'M3 11l9-8 9 8v10h-6v-6H9v6H3z',ozet:'M3 13h8V3H3zM13 21h8V11h-8zM3 21h8v-6H3zM13 3v6h8V3z',program:'M3 5h18v16H3zM3 9h18M8 3v4M16 3v4',plan:'M10 6h11M10 12h11M10 18h11M3 6l1.5 1.5L7 5M3 12l1.5 1.5L7 11M3 18l1.5 1.5L7 17',dagilim:'M12 3v9h9A9 9 0 1 1 12 3zM15 3.5A9 9 0 0 1 20.5 9H15z',konular:'M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2zM4 21V5M9 8h6',matris:'M3 3h18v18H3zM3 9h18M3 15h18M9 3v18M15 3v18',kitaplar:'M14 3H6v18h12V7zM14 3v4h4M9 13h6M9 17h6',sorular:'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17h.01',denemeler:'M9 3h6v3H9zM7 5H5v16h14V5h-2M9 14l2 2 4-4',cikmis:'M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l3 2',rapor:'M4 4h16v12H8l-4 4zM8 9h8M8 12h5',veli:'M4 4h16v12H8l-4 4zM8 9h8M8 12h5',dersler:'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 3',ucretler:'M3 7h18v13H3zM3 7l3-4h12l3 4M16 13h2',ogrenciler:'M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21v-1a6 6 0 0 1 12 0v1M16 3.5a4 4 0 0 1 0 7M22 21v-1a6 6 0 0 0-4-5.6',mufredat:'M12 3l9 5-9 5-9-5zM3 12l9 5 9-5M3 16l9 5 9-5',yedek:'M7 18a5 5 0 1 1 .9-9.9A6 6 0 0 1 19 10a4 4 0 0 1-1 8M12 12v8M9 15l3-3 3 3',yonetici:'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z',back:'M15 5l-7 7 7 7',out:'M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10'};
 const svgI=k=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${IC[k]||IC.ozet}"/></svg>`;
 const DESC={ozet:'Genel durum',program:'Görevler ve günlük plan',plan:'Konuları haftalara yerleştir',dagilim:'Konular ve ilerleme',konular:'Konular ve kaynaklar',matris:'Test test takip',kitaplar:'Kitap PDF’leri',sorular:'Günlük çözülen soru',denemeler:'Sınav ve optik form',cikmis:'Yıllara göre sorular',rapor:'Veliye haftalık rapor',veli:'Haftalık özet',dersler:'Takvim ve dersler',ucretler:'Ödeme ve bakiye',ogrenciler:'Ekle, düzenle, giriş',mufredat:'Ders ve konu yapısı',yedek:'Dışa aktar, geri yükle',yonetici:'Koçlar ve bedeller'};
@@ -1257,7 +1259,7 @@ window.addEventListener('popstate',()=>{if(!MOB)return;
     if(S.ui.view!=='ana')history.pushState({k:'page'},'');return}
   if(S.ui.examId){S.ui.examId=null;S.ui.examMode=null;history.pushState({k:'page'},'');render();return}
   if(S.ui.view!=='ana'){S.ui.view='ana';render();window.scrollTo(0,0)}});
-MQ.addEventListener('change',e=>{MOB=e.matches;if(S&&S.ui)MOBINIT=true;if(!MOB&&S&&S.ui.view==='ana')S.ui.view=PARENT?'veli':S.stuMode?'matris':'ozet';if(S&&!document.getElementById('app').hidden)render()});
+MQ.addEventListener('change',e=>{MOB=IN_APP||e.matches;if(S&&S.ui)MOBINIT=true;if(!MOB&&S&&S.ui.view==='ana')S.ui.view=PARENT?'veli':S.stuMode?'matris':'ozet';if(S&&!document.getElementById('app').hidden)render()});
 
 const NAV=[['ozet','Özet'],['program','Haftalık program'],['plan','Konu planı'],['dagilim','Konu dağılımı'],['konular','Konu ve kaynak'],['matris','Kaynak takibi'],['kitaplar','PDF kitaplar'],['sorular','Soru takibi'],['denemeler','Denemeler'],['cikmis','Çıkmış sorular'],['rapor','Veli raporu'],['dersler','Ders programım'],['ucretler','Alacak / verecek'],['ogrenciler','Öğrenciler'],['mufredat','Müfredat'],['yedek','Yedek']];
 const STU_VIEWS=['program','dagilim','matris','denemeler','kitaplar'],STU_DENY=new Set(['resetExam','del','mxMinus','mxClear','pastRm','clearPlan','resetAll','restore']),STU_COACH=new Set(['g4Fix','libAdd','autoPlan','optPause','openPlan','copyWeek','newExam','setKey','pasteKey','bulkTopic','addSec']);
